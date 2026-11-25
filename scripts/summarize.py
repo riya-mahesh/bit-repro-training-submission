@@ -3,6 +3,9 @@
 
     python3 scripts/summarize.py                 reads results/, writes RESULTS.md
     python3 scripts/summarize.py DIR OUT.md      other folder / output file
+    python3 scripts/summarize.py --check RUN.json
+                                                 one run: compares it with the reference hash
+                                                 and all other runs of the same setting
 
 Tables: reproducibility, accuracy, speed at batch size 100, breakdown by training phase,
 batch-size scaling and peak GPU memory. Exits with status 1 if any of our runs differ from
@@ -17,8 +20,10 @@ import statistics
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "results")
-DST = sys.argv[2] if len(sys.argv) > 2 else os.path.join(ROOT, "RESULTS.md")
+CHECK = sys.argv[2] if len(sys.argv) > 2 and sys.argv[1] == "--check" else None
+ARGS = [] if CHECK else sys.argv[1:]
+SRC = ARGS[0] if len(ARGS) > 0 else os.path.join(ROOT, "results")
+DST = ARGS[1] if len(ARGS) > 1 else os.path.join(ROOT, "RESULTS.md")
 
 # Final weights (after epoch 2) of our method, by (seed, batch size). They are the same on every
 # GPU and CUDA version; a different value means the arithmetic changed.
@@ -39,24 +44,27 @@ def gpu(device):
     return device.replace("NVIDIA ", "")
 
 
+def record(f):
+    try:
+        d = json.load(open(f))
+    except ValueError:
+        return None
+    if "mode" not in d or "hashes" not in d:
+        return None
+    if d.get("steps") != d.get("epochs", 0) * (60000 // d.get("batch", 1)):
+        return None                      # a shortened test run, not a full training run
+    d["gpu"] = gpu(d["device"])
+    tag = d.get("tag") or ""
+    if not re.fullmatch(r"cuda\d+", tag):  # a custom run label: use the CUDA version instead
+        tag = "cuda" + (d.get("cuda") or "").replace(".", "")
+    d["config"] = (d["gpu"], tag)
+    d["file"] = os.path.abspath(f)
+    return d
+
+
 def load():
-    runs = []
-    for f in sorted(glob.glob(os.path.join(SRC, "**", "mnist", "*.json"), recursive=True)):
-        try:
-            d = json.load(open(f))
-        except ValueError:
-            continue
-        if "mode" not in d or "hashes" not in d:
-            continue
-        if d.get("steps") != d.get("epochs", 0) * (60000 // d.get("batch", 1)):
-            continue                     # a shortened test run, not a full training run
-        d["gpu"] = gpu(d["device"])
-        tag = d.get("tag") or ""
-        if not re.fullmatch(r"cuda\d+", tag):  # a custom run label: use the CUDA version instead
-            tag = "cuda" + (d.get("cuda") or "").replace(".", "")
-        d["config"] = (d["gpu"], tag)
-        runs.append(d)
-    return runs
+    files = sorted(glob.glob(os.path.join(SRC, "**", "mnist", "*.json"), recursive=True))
+    return [d for d in map(record, files) if d]
 
 
 def config_key(c):
@@ -88,7 +96,43 @@ def table(header, rows):
     return "\n".join(out)
 
 
+def check(path):
+    # One line per run, printed by run_experiments.sh after each training run.
+    d = record(path)
+    if not d:
+        sys.exit("not a complete training run: " + path)
+    name = dict(METHODS)[d["mode"]]
+    h = d["hashes"]["weights_epoch_2"][:12]
+    print("  %s, seed %d, batch %d: test accuracy %.2f%%, %.2f ms per step, final weights %s"
+          % (name, d["seed"], d["batch"], 100 * d["test_accuracy"], d["step_ms_median"], h))
+    others = [r for r in load() if r["file"] != d["file"] and r["mode"] == d["mode"]
+              and r["seed"] == d["seed"] and r["batch"] == d["batch"]]
+    same = [r for r in others if fingerprint(r) == fingerprint(d)]
+    nconf = len({r["config"] for r in same})
+    ok = True
+    if d["mode"] == "repro" and (d["seed"], d["batch"]) in EXPECTED:
+        ok = h == EXPECTED[(d["seed"], d["batch"])]
+        print("    reference hash %s: %s" % (EXPECTED[(d["seed"], d["batch"])],
+              "MATCH" if ok else "MISMATCH (the arithmetic differs from the report)"))
+    if others and d["mode"] == "stock":
+        print("    differs from %d of %d earlier runs of this setting"
+              % (len(others) - len(same), len(others)))
+    elif others:
+        print("    identical to %d of %d earlier runs of this setting (%d GPU / CUDA configurations)"
+              % (len(same), len(others), nconf))
+        ok = ok and len(same) == len(others)
+    if d["mode"] == "stock":
+        print("    not reproducible, as expected for standard PyTorch")
+    elif ok:
+        print("    bit-reproducible: yes")
+    else:
+        print("    bit-reproducible: NO")
+    sys.exit(0 if ok else 1)
+
+
 def main():
+    if CHECK:
+        check(CHECK)
     runs = load()
     if not runs:
         sys.exit("no run records found under " + SRC)

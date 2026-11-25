@@ -44,7 +44,9 @@ train() {   # train LABEL MODE SEED BATCH [--profile]
   echo "[$HOST $TAG] $label"
   python3 "$REPO/repro_torch/mnist_repro.py" --mode "$mode" --device cuda --seed "$seed" --batch "$batch" \
       --epochs 2 --lr 0.01 --slices 3 --tag "$TAG" --out "$OUT/mnist/$label.txt" "$@" \
-      > "$OUT/logs/$label.log" 2>&1 || { echo "  FAILED: see $OUT/logs/$label.log"; FAILED=1; }
+      > "$OUT/logs/$label.log" 2>&1 || { echo "  FAILED: see $OUT/logs/$label.log"; FAILED=1; return; }
+  # accuracy, speed and final-weight hash, compared with the reference and all earlier runs
+  python3 "$REPO/scripts/summarize.py" --check "$OUT/mnist/$label.json" || FAILED=1
 }
 
 if [ "${QUICK:-0}" = 1 ]; then
@@ -71,5 +73,5 @@ if [ "${NCU:-0}" = 1 ]; then
   done
 fi
 
-if ((FAILED)); then echo "Some runs failed; see $OUT/logs"; exit 1; fi
+if ((FAILED)); then echo "Some runs failed or were not reproducible: see the messages above and $OUT/logs"; exit 1; fi
 echo "Done: $OUT. Next: python3 scripts/summarize.py"

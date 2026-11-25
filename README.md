@@ -100,16 +100,39 @@ QUICK=1 bash scripts/run_experiments.sh cuda124
 
 - **Why:** trains for 2 epochs with seed 0 and batch size 100, with ours, RepDL and standard
   PyTorch, from the same data, batch order and initial weights.
-- **Expect**, in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`:
-  - `test accuracy` about 0.98 for all three methods.
-  - `per step median` in ms: ours is somewhat slower than standard PyTorch and faster than
-    RepDL (about 5 times on cuda2 and cuda3, less on cuda5).
-  - `hash weights after epoch 2`: the fingerprint of the trained weights.
-- **Meaning:** our hash must be `6b8ce5843c58...`. This is the value of every one of our runs
-  in the report, on all four GPUs and CUDA 12.4 to 13.0, so the same value here shows
-  bit-reproducibility across hardware. RepDL, which fixes the order of every sum, also
-  repeats (`f3b851eed7b7...`). Standard PyTorch gives a different hash on almost every run,
-  which is the problem this project addresses.
+- **Expect:** after each run, the script prints the test accuracy, the time per step, the
+  hash of the final weights, and how this hash compares with the reference and with every
+  earlier run of the same setting in `results/`. For example, on the TITAN V:
+
+  ```
+  [cuda3 cuda124] repro_quick_20261201_101500
+    Ours, seed 0, batch 100: test accuracy 98.26%, 4.34 ms per step, final weights 6b8ce5843c58
+      reference hash 6b8ce5843c58: MATCH
+      identical to 35 of 35 earlier runs of this setting (8 GPU / CUDA configurations)
+      bit-reproducible: yes
+  [cuda3 cuda124] repdl_quick_20261201_101530
+    RepDL, seed 0, batch 100: test accuracy 97.76%, 14.86 ms per step, final weights f3b851eed7b7
+      identical to 32 of 32 earlier runs of this setting (8 GPU / CUDA configurations)
+      bit-reproducible: yes
+  [cuda3 cuda124] stock_quick_20261201_101600
+    Standard PyTorch, seed 0, batch 100: test accuracy 97.91%, 2.05 ms per step, final weights a823d48e018c
+      differs from 32 of 32 earlier runs of this setting
+      not reproducible, as expected for standard PyTorch
+  ```
+
+- **Meaning:**
+  - **Ours** must show `MATCH` and `bit-reproducible: yes`. The earlier runs were made on four
+    GPUs (TITAN V, RTX 2080 Ti, A100, RTX 4070) with CUDA 12.4 to 13.0, so a new run that is
+    identical to all of them shows bit-reproducibility across hardware and software. The
+    comparison covers every recorded hash (initial weights, weights after each epoch,
+    outputs) and every logged loss, not only the final weights.
+  - **RepDL** is also reproducible, because it fixes the order of every sum, but slower:
+    about 5 times on cuda2 and cuda3, less on cuda5.
+  - **Standard PyTorch** is the fastest but gives different weights on almost every run,
+    which is the problem this project addresses.
+  - Test accuracy is about 98% for all three, so reproducibility costs no accuracy.
+
+  The full log of each run is in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`.
 
 ### Step 4. Summarize
 
