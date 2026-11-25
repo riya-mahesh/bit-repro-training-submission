@@ -10,12 +10,11 @@ training) and standard PyTorch.
 The scripts rebuild everything from source on the NYU CIMS GPU servers, run the correctness
 tests, repeat the experiments of the report, and write [`RESULTS.md`](RESULTS.md).
 
-**Quick check** on one CIMS GPU server, about 25 minutes (details in [section 3](#3-quick-start-on-cims-about-25-minutes)):
+**Quick check** on one CIMS GPU server, about 15 minutes (details in [section 3](#3-quick-start-on-cims-about-15-minutes)):
 
 ```bash
 export REPRO_WORK=/scratch/$USER/repro PYTHON=python3.12
 bash scripts/setup_env.sh cuda124                # install CUDA 12.4, PyTorch and RepDL (once per server)
-bash scripts/run_tests.sh cuda124                # every kernel equals its exact CPU version: "OVERALL: PASS"
 QUICK=1 bash scripts/run_experiments.sh cuda124  # train once per method: our weights hash to 6b8ce5843c58...
 python3 scripts/summarize.py                     # verdict in RESULTS.md: "reproducible ... yes"
 ```
@@ -50,7 +49,7 @@ for bit.
 The scripts install everything else: PyTorch, numpy and RepDL (`setup_env.sh`), and the
 MNIST files, which are downloaded on the first run.
 
-## 3. Quick start on CIMS (about 25 minutes)
+## 3. Quick start on CIMS (about 15 minutes)
 
 The quick start checks the main claim of the report on one GPU: training with our kernels
 gives exactly the same weights as all our earlier runs on other GPUs and CUDA versions.
@@ -76,23 +75,7 @@ bash scripts/setup_env.sh cuda124
   baseline) at the exact versions used in the report.
 - **Expect:** the last line is `Ready: cuda124`.
 
-### Step 2. Test every kernel (about 5 minutes)
-
-```bash
-bash scripts/run_tests.sh cuda124
-```
-
-- **Why:** each GPU kernel (matrix multiplication, convolution, sums, softmax, pooling, Adam)
-  is compared bit for bit with an exact CPU implementation of the same arithmetic, on many
-  shapes and inputs. Exp and log are evaluated on all 2^32 float32 inputs and their outputs
-  hashed.
-- **Expect:** one `PASS` line per test, the hashes `repro_expf 4ccc7cddaea06b26` and
-  `repro_logf 117fa2a6bbdea567`, and the last line `OVERALL: PASS`.
-- **Meaning:** every kernel computes exactly its definition on this GPU. The exp/log hashes
-  are the same on every GPU, so these functions give identical bits everywhere. A `FAIL`
-  names the kernel that differs (full log: `results/<host>_cuda124/tests/tests.log`).
-
-### Step 3. Train LeNet-5 on MNIST once with each method (about 2 minutes)
+### Step 2. Train LeNet-5 on MNIST once with each method (about 2 minutes)
 
 ```bash
 QUICK=1 bash scripts/run_experiments.sh cuda124
@@ -134,7 +117,7 @@ QUICK=1 bash scripts/run_experiments.sh cuda124
 
   The full log of each run is in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`.
 
-### Step 4. Summarize
+### Step 3. Summarize
 
 ```bash
 python3 scripts/summarize.py
@@ -151,7 +134,7 @@ cat RESULTS.md
 
 ### Other CUDA versions
 
-Repeat steps 1-4 with `cuda126` (CUDA 12.6, PyTorch 2.7.1) or `cuda130` (CUDA 13.0, PyTorch
+Repeat steps 1-3 with `cuda126` (CUDA 12.6, PyTorch 2.7.1) or `cuda130` (CUDA 13.0, PyTorch
 2.9.0, cuda2 and cuda5 only, since CUDA 13 dropped the TITAN V). The expected output is the
 same, including our hash `6b8ce5843c58...`, which shows that the result does not depend on
 the CUDA version either. The same holds on another server.
@@ -170,10 +153,9 @@ export REPRO_WORK=/scratch/$USER/repro
 export PYTHON=python3.12
 
 bash scripts/setup_env.sh cuda124
-bash scripts/run_tests.sh cuda124
 bash scripts/run_experiments.sh cuda124
 
-bash scripts/setup_env.sh cuda126     # and the same two run commands with cuda126
+bash scripts/setup_env.sh cuda126     # then run_experiments.sh with cuda126
 bash scripts/setup_env.sh cuda130     # cuda2 and cuda5 only: CUDA 13.0 has no Volta support
 ```
 
@@ -232,7 +214,6 @@ singularity exec --nv --bind "$PWD:/work" --bind /path/to/venv:/venv --pwd /work
 export REPRO_WORK=/work/.work REPRO_VENV=/venv
 export CXX=/usr/bin/g++ CC=/usr/bin/gcc LDSHARED='/usr/bin/g++ -shared -pthread -B/usr/bin/'
 export LD_PRELOAD=$(/usr/bin/g++ -print-file-name=libstdc++.so.6)
-bash scripts/run_tests.sh cuda124
 bash scripts/run_experiments.sh cuda124
 python3 scripts/summarize.py
 ```
