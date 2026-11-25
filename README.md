@@ -220,29 +220,9 @@ to compare against the originals.
 Standard PyTorch is expected to give different weights in every run: it is the speed and
 accuracy reference, not a reproducible method. RepDL is reproducible but slower.
 
-## 6. The A100 on the NYU HPC cluster
 
-There the GPU is used inside a CUDA development container, with an existing Python
-environment that has PyTorch 2.6.0 (CUDA 12.4 wheel), numpy and RepDL. On a node with an
-allocated A100, from the repository folder:
 
-```bash
-singularity exec --nv --bind "$PWD:/work" --bind /path/to/venv:/venv --pwd /work \
-    /share/apps/images/cuda12.6.2-cudnn9.5.0-devel-ubuntu24.04.1.sif /bin/bash --noprofile --norc
-
-# inside the container
-export REPRO_WORK=/work/.work REPRO_VENV=/venv
-export CXX=/usr/bin/g++ CC=/usr/bin/gcc LDSHARED='/usr/bin/g++ -shared -pthread -B/usr/bin/'
-export LD_PRELOAD=$(/usr/bin/g++ -print-file-name=libstdc++.so.6)
-bash scripts/run_experiments.sh cuda124
-python3 scripts/summarize.py
-```
-
-The compiler settings make the extension build with the container's compiler and load with
-its C++ runtime. The container's nvcc (12.6) is newer than the wheel's CUDA (12.4), which
-only produces a version warning. Results go to `results/<node>_cuda124/`.
-
-## 7. Running pieces by hand
+## 6. Running pieces by hand
 
 ```bash
 source $REPRO_WORK/envs/cuda124/bin/activate && module load cuda-12.4
