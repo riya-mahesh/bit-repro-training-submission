@@ -26,12 +26,20 @@ load_module() {
 }
 
 # load_config TAG: loads the CUDA module and Python environment made by setup_env.sh.
+# REPRO_VENV=/path/to/venv uses an existing environment instead (it must have the PyTorch
+# wheel named by TAG, numpy and optionally RepDL); nvcc must then already be on PATH.
 load_config() {
   TAG=$1
-  ENV_DIR="$REPRO_WORK/envs/$TAG"
-  [ -f "$ENV_DIR/config" ] || { echo "No environment '$TAG'. Create it first, e.g.: bash scripts/setup_env.sh cuda124"; exit 1; }
-  # shellcheck disable=SC1091
-  source "$ENV_DIR/config"
+  if [ -n "${REPRO_VENV:-}" ]; then
+    ENV_DIR=$REPRO_VENV
+    CUDA_MODULE=""
+    [ -f "$ENV_DIR/bin/activate" ] || { echo "REPRO_VENV=$ENV_DIR is not a Python environment"; exit 1; }
+  else
+    ENV_DIR="$REPRO_WORK/envs/$TAG"
+    [ -f "$ENV_DIR/config" ] || { echo "No environment '$TAG'. Create it first, e.g.: bash scripts/setup_env.sh cuda124"; exit 1; }
+    # shellcheck disable=SC1091
+    source "$ENV_DIR/config"
+  fi
   load_module "$CUDA_MODULE"
   # shellcheck disable=SC1091
   source "$ENV_DIR/bin/activate"

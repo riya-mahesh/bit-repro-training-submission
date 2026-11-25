@@ -4,4 +4,5 @@ build/
 __pycache__/
 *.egg-info/
 repro_torch/data/
+.work/
 .DS_Store

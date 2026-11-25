@@ -88,7 +88,8 @@ protocol (~20 minutes per configuration):
     bash scripts/setup_env.sh cuda130     # cuda2 and cuda5 only: CUDA 13.0 has no Volta support
 
 Configurations used in the report: TITAN V (cuda3) with CUDA 12.4 and 12.6, RTX 2080 Ti
-(cuda2) with CUDA 12.4 and 12.6, RTX 4070 (cuda5) with CUDA 12.4, 12.6 and 13.0.
+(cuda2) with CUDA 12.4 and 12.6, RTX 4070 (cuda5) with CUDA 12.4, 12.6 and 13.0, and an A100
+on the NYU HPC cluster (section 6).
 
 The full protocol on one GPU trains each method with seed 0 three times and seeds 1-4 once
 at batch size 100, once more with a timer around the forward pass, backward pass and
@@ -125,7 +126,29 @@ Standard PyTorch is expected to give different weights in every run: it is the s
 accuracy reference, not a reproducible method. RepDL is reproducible but slower.
 
 
-6. Running pieces by hand
+6. The A100 on the NYU HPC cluster
+----------------------------------
+There the GPU is used inside a CUDA development container, with an existing Python
+environment that has PyTorch 2.6.0 (CUDA 12.4 wheel), numpy and RepDL. On a node with an
+allocated A100, from the repository folder:
+
+    singularity exec --nv --bind "$PWD:/work" --bind /path/to/venv:/venv --pwd /work \
+        /share/apps/images/cuda12.6.2-cudnn9.5.0-devel-ubuntu24.04.1.sif /bin/bash --noprofile --norc
+
+    # inside the container
+    export REPRO_WORK=/work/.work REPRO_VENV=/venv
+    export CXX=/usr/bin/g++ CC=/usr/bin/gcc LDSHARED='/usr/bin/g++ -shared -pthread -B/usr/bin/'
+    export LD_PRELOAD=$(/usr/bin/g++ -print-file-name=libstdc++.so.6)
+    bash scripts/run_tests.sh cuda124
+    bash scripts/run_experiments.sh cuda124
+    python3 scripts/summarize.py
+
+The compiler settings make the extension build with the container's compiler and load
+with its C++ runtime. The container's nvcc (12.6) is newer than the wheel's CUDA (12.4),
+which only produces a version warning. Results go to results/<node>_cuda124/.
+
+
+7. Running pieces by hand
 -------------------------
     source $REPRO_WORK/envs/cuda124/bin/activate && module load cuda-12.4
     cd repro_torch && python3 setup.py build_ext --inplace
