@@ -48,7 +48,7 @@ train() {   # train LABEL MODE SEED BATCH [--profile]
 }
 
 if [ "${QUICK:-0}" = 1 ]; then
-  for m in "${MODES[@]}"; do train "${m}_seed0_run1" "$m" 0 100; done
+  for m in "${MODES[@]}"; do train "${m}_quick_$(date +%Y%m%d_%H%M%S)" "$m" 0 100; done   # never overwrites earlier runs
 else
   for r in 1 2 3; do for m in "${MODES[@]}"; do train "${m}_seed0_run$r" "$m" 0 100; done; done
   for s in 1 2 3 4; do for m in "${MODES[@]}"; do train "${m}_seed$s" "$m" "$s" 100; done; done

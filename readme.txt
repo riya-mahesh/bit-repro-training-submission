@@ -69,7 +69,9 @@ prefix the commands with GPU=1.
 
 Expected outcome: RESULTS.md ends with "bit-reproducible and match the reference hashes:
 yes". With seed 0, our final weights hash to 6b8ce5843c58... on every GPU and CUDA version
-(see results/<host>_<config>/mnist/repro_seed0_run1.txt).
+(line "hash weights after epoch 2" in results/<host>_<config>/mnist/repro_quick_*.txt).
+The quick runs are added next to the results already in results/, so the summary also
+checks that they agree bit for bit with all earlier runs of the same setting.
 
 
 4. Full reproduction (as in the report)
