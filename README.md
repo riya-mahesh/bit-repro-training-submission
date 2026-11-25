@@ -8,7 +8,7 @@ PyTorch.
 
 **Instructions:** see [`readme.txt`](readme.txt) for the folder layout and the commands that
 rebuild everything from source on the NYU CIMS GPU servers.
-**Results:** [`RESULTS.md`](RESULTS.md) summarizes every run in [`results/`](results/).
+**Results:** [`RESULTS.md`](RESULTS.md) summarizes every run in [`results/`](results/), which holds the raw records of all experiments in the report.
 
 ```bash
 export REPRO_WORK=/scratch/$USER/repro PYTHON=python3.12

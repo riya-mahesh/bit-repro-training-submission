@@ -24,8 +24,9 @@ repro_nn_cuda/     max pooling (first maximum wins) and Adam (fixed IEEE operati
 repro_torch/       PyTorch layers on top of these kernels, and the MNIST experiment
                    (mnist_repro.py), which also runs RepDL and standard PyTorch
 scripts/           setup, tests, experiments and the results summary
-results/           records of every run (created by the scripts)
-RESULTS.md         summary tables of all runs (written by scripts/summarize.py)
+results/           the raw record of every run in the report, one folder per server and
+                   CUDA version (a100_cuda124/profiling has the Nsight Compute profile)
+RESULTS.md         summary tables of all runs in results/ (written by scripts/summarize.py)
 
 Each kernel folder has the GPU code (.cu, .cuh), an exact CPU version of the same
 definition (*_cpu.h or *_math.cuh) and a GPU test (test_*.cu) comparing the two bit for bit.
@@ -39,6 +40,9 @@ definition (*_cpu.h or *_math.cuh) and a GPU test (test_*.cu) comparing the two 
   venv and pip, git, and internet access for pip, RepDL and the MNIST files.
 - Several GB of disk per configuration, outside the 4 GB CIMS home quota (/scratch).
 - Do not compile with --use_fast_math: the results depend on exact IEEE arithmetic.
+
+The scripts install everything else: PyTorch, numpy and RepDL (setup_env.sh), and the MNIST
+files, which are downloaded on the first run.
 
 
 3. Quick start on CIMS (about 25 minutes)
@@ -109,6 +113,10 @@ After all runs, on any of the servers (all results are in results/):
 
 To combine runs from several servers, copy their results/<host>_<config>/ folders into
 one results/ folder first.
+
+A full run on a server and CUDA version that is already in results/ (for example cuda3 with
+cuda124) replaces the included files of that folder. "git status" shows which ones changed,
+and "git checkout results/" restores the originals.
 
 
 5. What the summary reports
