@@ -57,7 +57,8 @@ gives exactly the same weights as all our earlier runs on other GPUs and CUDA ve
 ### Step 0. Log in and prepare
 
 ```bash
-ssh -J <netid>@access.cims.nyu.edu <netid>@cuda2.cims.nyu.edu    # or cuda3 / cuda5
+ssh -J <netid>@access.cims.nyu.edu
+ssh cuda2    # or cuda3 / cuda5
 tmux                                     # optional: keeps runs alive if ssh drops
 nvidia-smi                               # check that GPU 0 is free (else use GPU=1)
 cd bit-repro-training-submission         # the unzipped submission
