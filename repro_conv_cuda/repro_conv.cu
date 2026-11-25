@@ -249,8 +249,8 @@ cudaError_t repro_conv2d_ws(const float* x, const float* weight, float* out, con
 cudaError_t repro_conv2d_grad_weight_ws(const float* dy, const float* x, float* dw, const ConvShape& g, int S,
                                         void* workspace, size_t workspace_bytes, cudaStream_t stream) {
     size_t need;
-    cudaError_t e = conv2d_grad_weight_workspace(g, S, &need);
-    if (e != cudaSuccess) return e;
+    cudaError_t status = conv2d_grad_weight_workspace(g, S, &need);
+    if (status != cudaSuccess) return status;
     if (workspace_bytes < need) return cudaErrorInvalidValue;
     int K = g.K(), rows = g.F + K, chunks = image_chunks(g.N);
     char* base = static_cast<char*>(workspace);
