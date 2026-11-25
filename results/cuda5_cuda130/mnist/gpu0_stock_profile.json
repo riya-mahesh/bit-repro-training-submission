@@ -1,0 +1,48 @@
+{
+ "mode": "stock",
+ "tag": "cuda130",
+ "host": "cuda5.cims.nyu.edu",
+ "device": "NVIDIA GeForce RTX 4070",
+ "driver": "595.104.02",
+ "torch": "2.9.0+cu130",
+ "cuda": "13.0",
+ "seed": 0,
+ "slices": 3,
+ "batch": 100,
+ "lr": 0.01,
+ "epochs": 2,
+ "steps": 1200,
+ "profile": true,
+ "hashes": {
+  "weights_epoch_1": "eb43568b21221745e492a16cb6dd28400f2fdde88298f87389b2089215b5f629",
+  "weights_epoch_2": "95ef0e066818d3337ee450d8aab62746171bd99b29c0bcfae71e9938096a7109",
+  "test_logits": "8ec64ea43c33c82170796cc71b5ea0730a49618c549e4620f22d94432dd1b3a8",
+  "train_logits": "0b3ce4f916269c6574d23928341dda98b3d7a51cfab70e5fdf85163179d790a9",
+  "init": "aaed3ac81bea729c209ada6d6d88748a15a6d1616a0b896df3f67262f5f0ca10"
+ },
+ "train_accuracy": 0.9872166666666666,
+ "test_accuracy": 0.9849,
+ "curve": [
+  {
+   "epoch": 1,
+   "step": 600,
+   "test_accuracy": 0.979
+  },
+  {
+   "epoch": 2,
+   "step": 1200,
+   "test_accuracy": 0.9849
+  }
+ ],
+ "final_loss": 0.16587001085281372,
+ "train_seconds": 11.075838130433112,
+ "step_ms_median": 9.494653902947903,
+ "step_ms_mean": 8.861438719220615,
+ "step_ms_p95": 9.657528717070818,
+ "breakdown_ms": {
+  "forward": 2.989912871271372,
+  "backward": 4.695704206824303,
+  "optimizer": 1.8214089795947075
+ },
+ "peak_memory_mib": 239.6796875
+}

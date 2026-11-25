@@ -1,0 +1,44 @@
+{
+ "mode": "stock",
+ "tag": "cuda124",
+ "host": "cuda2.cims.nyu.edu",
+ "device": "NVIDIA GeForce RTX 2080 Ti",
+ "driver": "595.104.02",
+ "torch": "2.6.0+cu124",
+ "cuda": "12.4",
+ "seed": 0,
+ "slices": 3,
+ "batch": 500,
+ "lr": 0.01,
+ "epochs": 2,
+ "steps": 240,
+ "profile": false,
+ "hashes": {
+  "weights_epoch_1": "64c53383334445c0c63263b08120effcf95afc4ac7c70422b9dc455fa4b30f4d",
+  "weights_epoch_2": "1606596365bd097c64f71fef3c91797b6b8dee2c923f3961b960556fb91c882e",
+  "test_logits": "db6d2ddf01a06cb1aa7993b94ec58cc6e5ed41d142438aa61d21fea51e3a23e2",
+  "train_logits": "0ae05f6cdcabd6122a7b58320bed9a9b3b736996a3607b65fafa3f035029ab1a",
+  "init": "aaed3ac81bea729c209ada6d6d88748a15a6d1616a0b896df3f67262f5f0ca10"
+ },
+ "train_accuracy": 0.9852166666666666,
+ "test_accuracy": 0.9838,
+ "curve": [
+  {
+   "epoch": 1,
+   "step": 120,
+   "test_accuracy": 0.9693
+  },
+  {
+   "epoch": 2,
+   "step": 240,
+   "test_accuracy": 0.9838
+  }
+ ],
+ "final_loss": 0.047324229031801224,
+ "train_seconds": 0.9545831377618015,
+ "step_ms_median": 2.87878280505538,
+ "step_ms_mean": 2.878738747552988,
+ "step_ms_p95": 2.8926427476108074,
+ "breakdown_ms": {},
+ "peak_memory_mib": 281.77783203125
+}

@@ -1,0 +1,26 @@
+mode stock device cuda NVIDIA GeForce RTX 4070 torch 2.9.0+cu130 cuda 13.0
+batch 100 lr 0.01 epochs 2 slices 3 seed 0
+hash data 55c41ac0f5a8c45648c69c8349247c8db8573ea50fafdc37b5123844f825fae0
+hash init aaed3ac81bea729c209ada6d6d88748a15a6d1616a0b896df3f67262f5f0ca10
+  epoch 1 step 100 loss 0.0925 (bits 3dbd7ee6)
+  epoch 1 step 200 loss 0.1797 (bits 3e380fd8)
+  epoch 1 step 300 loss 0.0949 (bits 3dc273c8)
+  epoch 1 step 400 loss 0.0590 (bits 3d71a63b)
+  epoch 1 step 500 loss 0.0557 (bits 3d641023)
+  epoch 1 step 600 loss 0.0651 (bits 3d854e5f)
+hash weights after epoch 1 (600 steps) 2378af1ae16fea7ba696ea8afed4d103632a16bf6f0f8440f971497fef076ba4
+test accuracy after epoch 1: 0.9747
+  epoch 2 step 700 loss 0.0157 (bits 3c80af56)
+  epoch 2 step 800 loss 0.1470 (bits 3e16854a)
+  epoch 2 step 900 loss 0.0641 (bits 3d83454d)
+  epoch 2 step 1000 loss 0.0905 (bits 3db94df2)
+  epoch 2 step 1100 loss 0.0497 (bits 3d4b8fad)
+  epoch 2 step 1200 loss 0.1646 (bits 3e28864a)
+hash weights after epoch 2 (1200 steps) f7e410d31cf8875423d982950e0965d5fe02bfe7674c170e3a51e432dca86d0f
+test accuracy after epoch 2: 0.9803
+hash test logits 4523c9de4dad52d45e91551fdc134baf5afa4ce82b6fb3007be6ffaabcab5682
+hash train logits f0fc6df18a5938eeaf1508b45c5340cf8fb51366f994c117e1e8573a71d44b13
+train accuracy 0.9847
+test accuracy 0.9803
+time train total 10.75 s; per step median 9.240 ms, mean 8.578 ms (1200 steps)
+peak GPU memory 239.7 MiB

@@ -1,0 +1,38 @@
+mode stock device cuda NVIDIA GeForce RTX 4070 torch 2.9.0+cu130 cuda 13.0
+batch 50 lr 0.01 epochs 2 slices 3 seed 0
+hash data 55c41ac0f5a8c45648c69c8349247c8db8573ea50fafdc37b5123844f825fae0
+hash init aaed3ac81bea729c209ada6d6d88748a15a6d1616a0b896df3f67262f5f0ca10
+  epoch 1 step 100 loss 0.6457 (bits 3f254ca0)
+  epoch 1 step 200 loss 0.1367 (bits 3e0c0784)
+  epoch 1 step 300 loss 0.2802 (bits 3e8f7c26)
+  epoch 1 step 400 loss 0.1545 (bits 3e1e3366)
+  epoch 1 step 500 loss 0.0352 (bits 3d10049d)
+  epoch 1 step 600 loss 0.1645 (bits 3e2873d1)
+  epoch 1 step 700 loss 0.0778 (bits 3d9f4214)
+  epoch 1 step 800 loss 0.1754 (bits 3e33a7da)
+  epoch 1 step 900 loss 0.0595 (bits 3d73afc6)
+  epoch 1 step 1000 loss 0.0672 (bits 3d89b9da)
+  epoch 1 step 1100 loss 0.0834 (bits 3daabab4)
+  epoch 1 step 1200 loss 0.1604 (bits 3e244586)
+hash weights after epoch 1 (1200 steps) 43b57e3c3a92449366c43ee69a01908da66ec3a24cc1dc95f9a18beb298d3c18
+test accuracy after epoch 1: 0.9636
+  epoch 2 step 1300 loss 0.3272 (bits 3ea782ee)
+  epoch 2 step 1400 loss 0.0202 (bits 3ca56af7)
+  epoch 2 step 1500 loss 0.0879 (bits 3db40292)
+  epoch 2 step 1600 loss 0.0082 (bits 3c060846)
+  epoch 2 step 1700 loss 0.0920 (bits 3dbc7096)
+  epoch 2 step 1800 loss 0.0030 (bits 3b4692c9)
+  epoch 2 step 1900 loss 0.0590 (bits 3d71986c)
+  epoch 2 step 2000 loss 0.1099 (bits 3de102c0)
+  epoch 2 step 2100 loss 0.0456 (bits 3d3a934f)
+  epoch 2 step 2200 loss 0.3376 (bits 3eacde2e)
+  epoch 2 step 2300 loss 0.0081 (bits 3c045b16)
+  epoch 2 step 2400 loss 0.3100 (bits 3e9ebba7)
+hash weights after epoch 2 (2400 steps) b534c349e8c70034549c79f4b52c9d8f4919b9227b2e05bf7b32a4740d295c6c
+test accuracy after epoch 2: 0.9663
+hash test logits 43b2268444c6f56c25ac973211f82b7bcfabda1772b1d6b28866356a5639f2c8
+hash train logits 0bd722276d69173a862f506d89e4c0bfd1702eb0fe04eeaf49d37b67039e5bf5
+train accuracy 0.9684
+test accuracy 0.9663
+time train total 21.40 s; per step median 9.126 ms, mean 8.725 ms (2400 steps)
+peak GPU memory 234.6 MiB

@@ -1,0 +1,38 @@
+mode stock device cuda NVIDIA GeForce RTX 2080 Ti torch 2.6.0+cu124 cuda 12.4
+batch 50 lr 0.01 epochs 2 slices 3 seed 0
+hash data 55c41ac0f5a8c45648c69c8349247c8db8573ea50fafdc37b5123844f825fae0
+hash init aaed3ac81bea729c209ada6d6d88748a15a6d1616a0b896df3f67262f5f0ca10
+  epoch 1 step 100 loss 0.3994 (bits 3ecc81ea)
+  epoch 1 step 200 loss 0.2140 (bits 3e5b2bc0)
+  epoch 1 step 300 loss 0.3299 (bits 3ea8e8f7)
+  epoch 1 step 400 loss 0.1010 (bits 3dcec5bf)
+  epoch 1 step 500 loss 0.0260 (bits 3cd4f723)
+  epoch 1 step 600 loss 0.0991 (bits 3dcae4f3)
+  epoch 1 step 700 loss 0.1208 (bits 3df76c0c)
+  epoch 1 step 800 loss 0.0543 (bits 3d5e72d8)
+  epoch 1 step 900 loss 0.1145 (bits 3dea95df)
+  epoch 1 step 1000 loss 0.0325 (bits 3d04fce3)
+  epoch 1 step 1100 loss 0.1021 (bits 3dd1145b)
+  epoch 1 step 1200 loss 0.0800 (bits 3da3d44a)
+hash weights after epoch 1 (1200 steps) 1c9fdee771650b0cdcbb14062eeceb647363b1da1898a35b6fabd358a906bc5f
+test accuracy after epoch 1: 0.9750
+  epoch 2 step 1300 loss 0.0748 (bits 3d991931)
+  epoch 2 step 1400 loss 0.0240 (bits 3cc4f398)
+  epoch 2 step 1500 loss 0.1057 (bits 3dd882bf)
+  epoch 2 step 1600 loss 0.0843 (bits 3dac94aa)
+  epoch 2 step 1700 loss 0.0899 (bits 3db803e9)
+  epoch 2 step 1800 loss 0.1993 (bits 3e4c195c)
+  epoch 2 step 1900 loss 0.0713 (bits 3d92168a)
+  epoch 2 step 2000 loss 0.0554 (bits 3d62d24e)
+  epoch 2 step 2100 loss 0.0285 (bits 3ce98eaa)
+  epoch 2 step 2200 loss 0.2279 (bits 3e69525d)
+  epoch 2 step 2300 loss 0.0039 (bits 3b7ccc9f)
+  epoch 2 step 2400 loss 0.2725 (bits 3e8b87a4)
+hash weights after epoch 2 (2400 steps) b212fc1531b673df546693a218adf048e871c14c6db7f50948ef45e23f2e018b
+test accuracy after epoch 2: 0.9785
+hash test logits 0602c36840be841159e67ffde5a44675d6f9bb66c92e21f185e8ab1e69d77dde
+hash train logits 61eec3f4341aa11a4b431cf7884fc2d964348a1037e03538682785149438d8f6
+train accuracy 0.9806
+test accuracy 0.9785
+time train total 6.19 s; per step median 2.469 ms, mean 2.473 ms (2400 steps)
+peak GPU memory 234.6 MiB

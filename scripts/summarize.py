@@ -12,6 +12,7 @@ import collections
 import glob
 import json
 import os
+import re
 import statistics
 import sys
 
@@ -50,7 +51,10 @@ def load():
         if d.get("steps") != d.get("epochs", 0) * (60000 // d.get("batch", 1)):
             continue                     # a shortened test run, not a full training run
         d["gpu"] = gpu(d["device"])
-        d["config"] = (d["gpu"], d.get("tag") or "cuda" + (d.get("cuda") or "").replace(".", ""))
+        tag = d.get("tag") or ""
+        if not re.fullmatch(r"cuda\d+", tag):  # a custom run label: use the CUDA version instead
+            tag = "cuda" + (d.get("cuda") or "").replace(".", "")
+        d["config"] = (d["gpu"], tag)
         runs.append(d)
     return runs
 

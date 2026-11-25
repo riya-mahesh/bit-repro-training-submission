@@ -63,7 +63,7 @@ if [ "${NCU:-0}" = 1 ]; then
   mkdir -p "$OUT/profiling"
   for b in 100 500; do
     echo "[$HOST $TAG] Nsight Compute, batch size $b"
-    ncu --set full --kernel-name-base function --kernel-name 'regex:weight_grad_kernel|partial_max_kernel' \
+    ncu --set full --kernel-name-base function --kernel-name 'regex:weight_grad_kernel|filter_scales_kernel' \
         --launch-skip 8 --launch-count 4 --export "$OUT/profiling/wgrad_batch$b" --force-overwrite \
         python3 "$REPO/repro_torch/mnist_repro.py" --mode repro --device cuda --batch "$b" --seed 0 --slices 3 \
         --max-steps 10 > "$OUT/logs/ncu_batch$b.log" 2>&1 || { echo "  FAILED: see $OUT/logs/ncu_batch$b.log"; FAILED=1; }
