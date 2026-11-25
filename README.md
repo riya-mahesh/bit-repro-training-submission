@@ -92,7 +92,7 @@ bit of a single weight gives a completely different hash. Two runs with the same
 therefore have bit-identical weights, and two runs with different hashes differ somewhere,
 even if only in the last bit of one weight.
 
-**What the TA sees.** After each of the three runs, the script prints the test accuracy, the
+**Expected output.** After each of the three runs, the script prints the test accuracy, the
 time per training step and the weight hash. It then compares the run with two things:
 
 - the **reference hash**, our seed-0 result recorded in the report (`6b8ce5843c58`), and
@@ -101,7 +101,7 @@ time per training step and the weight hash. It then compares the run with two th
   identical only if every recorded hash (initial weights, weights after each epoch, model
   outputs) and every logged loss are identical.
 
-Example output on the TITAN V:
+For example, on the TITAN V:
 
 ```
 [cuda3 cuda124] repro_quick_20261201_101500
