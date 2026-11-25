@@ -151,19 +151,19 @@ int main() {
     // Softmax at the shapes training uses.
     check_softmax("MNIST 100x10", normal(100 * 10, 5.0f, g), 100, 10, true, g);
     check_softmax("short rows 2000x3", normal(2000 * 3, 2.0f, g), 2000, 3, true, g);
-    check_softmax("one row of 50257", normal(50257, 8.0f, g), 1, 50257, true, g);
-    check_softmax("vocab 8x50257 (staged)", normal((size_t)8 * 50257, 8.0f, g), 8, 50257, true, g);
-    check_softmax("vocab 256x50257 (fused)", normal((size_t)256 * 50257, 8.0f, g), 256, 50257, true, g);
+    check_softmax("one row of 50001", normal(50001, 8.0f, g), 1, 50001, true, g);
+    check_softmax("wide rows 8x50001 (staged)", normal((size_t)8 * 50001, 8.0f, g), 8, 50001, true, g);
+    check_softmax("wide rows 256x50001 (fused)", normal((size_t)256 * 50001, 8.0f, g), 256, 50001, true, g);
     check_softmax("large gaps (subnormal exps) 300x257", normal(300 * 257, 60.0f, g), 300, 257, true, g);
     check_softmax("single element 5x1", normal(5, 3.0f, g), 5, 1, true, g);
 
-    // Causal attention: row r may see columns 0..r; the rest are -inf and must give exactly 0.
+    // Lower-triangular mask: row r keeps columns 0..r; the rest are -inf and must give exactly 0.
     {
         const int T = 1024;
         auto x = normal((size_t)T * T, 4.0f, g);
         for (int r = 0; r < T; ++r)
             for (int c = r + 1; c < T; ++c) x[(size_t)r * T + c] = -INFINITY;
-        check_softmax("causal attention 1024x1024", x, T, T, true, g);
+        check_softmax("lower-triangular mask 1024x1024", x, T, T, true, g);
         auto p = gpu_softmax(x, T, T);
         bool zero = true;
         for (int r = 0; r < T; ++r)
@@ -191,8 +191,8 @@ int main() {
     // Cross-entropy at the shapes training uses, including ignored rows and row order.
     const struct { const char* name; int rows, cols; float scale; int ignored; bool nonfinite; } ce[] = {
         {"MNIST 100x10", 100, 10, 5.0f, 0},
-        {"GPT-2 8x50257, 3 rows ignored (staged)", 8, 50257, 8.0f, 3},
-        {"GPT-2 256x50257, 3 rows ignored (fused)", 256, 50257, 8.0f, 3},
+        {"wide rows 8x50001, 3 rows ignored (staged)", 8, 50001, 8.0f, 3},
+        {"wide rows 256x50001, 3 rows ignored (fused)", 256, 50001, 8.0f, 3},
         {"short rows 2000x3, 500 rows ignored", 2000, 3, 2.0f, 500},
         {"large gaps 300x257", 300, 257, 60.0f, 0},
         {"all rows ignored", 100, 10, 5.0f, 100},

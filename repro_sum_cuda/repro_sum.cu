@@ -8,7 +8,7 @@ namespace repro_sum {
 
 // ---------------------------------------------------------------------------
 // Rows (A == 1, moderate C): one warp per row, e.g. softmax denominators and
-// LayerNorm statistics. Anchor, merge, and rounding all happen inside the warp.
+// row means. Anchor, merge, and rounding all happen inside the warp.
 // ---------------------------------------------------------------------------
 __global__ void __launch_bounds__(THREADS)
 sum_rows_kernel(const float* __restrict__ x, float* __restrict__ out, int rows, int C, uint32_t divisor) {

@@ -95,7 +95,7 @@ int main() {
         {"Softmax row sums 100x10", 1, 100, 10},
         {"Columns 4096x1000", 4096, 1000, 1},
         {"Rows 300x5000", 1, 300, 5000},
-        {"LayerNorm-like rows 1024x1024", 1, 1024, 1024},
+        {"Square rows 1024x1024", 1, 1024, 1024},
         {"Short odd rows 2000x13", 1, 2000, 13},
         {"Rows 512x8191", 1, 512, 8191},
         {"Vector of 3,000,001", 1, 1, 3000001},

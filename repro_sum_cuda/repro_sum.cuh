@@ -17,7 +17,7 @@ namespace repro_sum {
 //   Linear bias gradient, sum over rows of [M, N]:      A = M, B = N, C = 1
 //   Conv bias gradient, sum over N, H, W of NCHW:       A = N, B = C, C = H * W
 //   Loss mean over a vector of n values:                A = 1, B = 1, C = n, mean = true
-//   Per-row sums (softmax denominators, LayerNorm):     A = 1, B = rows, C = cols
+//   Per-row sums (softmax denominators, row means):     A = 1, B = rows, C = cols
 //
 // Exactly zero results are +0.0. NaN/Inf inputs give NaN for that output.
 // Requires A * C <= 2^31 - 1.

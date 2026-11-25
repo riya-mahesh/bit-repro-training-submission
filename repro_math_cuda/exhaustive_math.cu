@@ -48,7 +48,7 @@ static const char* kNotes[F_COUNT] = {
     "CUDA log1pf",
     "CUDA expm1f",
     "CUDA tanhf (torch.tanh)",
-    "CUDA erff (exact GELU)",
+    "CUDA erff",
     "PyTorch formula: 1/(1+expf(-x))",
     "IEEE sqrt (should be exact)",
     "approximate reciprocal sqrt",

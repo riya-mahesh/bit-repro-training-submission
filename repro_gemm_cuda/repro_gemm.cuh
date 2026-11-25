@@ -7,7 +7,7 @@ namespace repro_gemm {
 
 // Reproducible GEMM: C[M,N] = op(A)[M,K] * op(B)[K,N], FP32 in and out, row-major.
 //
-// Method (see README.md): each row of op(A) and column of op(B) gets a power-of-two
+// Method: each row of op(A) and column of op(B) gets a power-of-two
 // scale from its max |value|. Every input is rounded once to a fixed-point integer
 // with 7*S bits ("S slices"), split exactly into S int8 digits, and the digit
 // products are computed with int8 GEMMs and combined exactly in INT64. The exact

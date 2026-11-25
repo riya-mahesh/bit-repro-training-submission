@@ -7,7 +7,7 @@
 //   p[i] = e[i] / S                        IEEE division
 //
 // Each step has one defined answer, so the output does not depend on order, batching, or
-// hardware. -inf entries (masked attention positions) give exactly 0. If the row has NaN
+// hardware. -inf entries (masked positions) give exactly 0. If the row has NaN
 // or +inf, or every entry is -inf, the whole row is NaN (0x7FC00000).
 #include "repro_math.cuh"
 #include "repro_sum_math.cuh"
