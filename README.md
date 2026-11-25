@@ -81,41 +81,60 @@ bash scripts/setup_env.sh cuda124
 QUICK=1 bash scripts/run_experiments.sh cuda124
 ```
 
-- **Why:** trains for 2 epochs with seed 0 and batch size 100, with ours, RepDL and standard
-  PyTorch, from the same data, batch order and initial weights.
-- **Expect:** after each run, the script prints the test accuracy, the time per step, the
-  hash of the final weights, and how this hash compares with the reference and with every
-  earlier run of the same setting in `results/`. For example, on the TITAN V:
+**What it does.** Trains LeNet-5 for 2 epochs (seed 0, batch size 100) three times: with
+our kernels, with RepDL and with standard PyTorch. All three start from the same initial
+weights and see the same data in the same order, so any difference in the result comes
+from the arithmetic alone.
 
-  ```
-  [cuda3 cuda124] repro_quick_20261201_101500
-    Ours, seed 0, batch 100: test accuracy 98.26%, 4.34 ms per step, final weights 6b8ce5843c58
-      reference hash 6b8ce5843c58: MATCH
-      identical to 35 of 35 earlier runs of this setting (8 GPU / CUDA configurations)
-      bit-reproducible: yes
-  [cuda3 cuda124] repdl_quick_20261201_101530
-    RepDL, seed 0, batch 100: test accuracy 97.76%, 14.86 ms per step, final weights f3b851eed7b7
-      identical to 32 of 32 earlier runs of this setting (8 GPU / CUDA configurations)
-      bit-reproducible: yes
-  [cuda3 cuda124] stock_quick_20261201_101600
-    Standard PyTorch, seed 0, batch 100: test accuracy 97.91%, 2.05 ms per step, final weights a823d48e018c
-      differs from 32 of 32 earlier runs of this setting
-      not reproducible, as expected for standard PyTorch
-  ```
+**What is the hash.** After training, the script computes a SHA-256 hash over the raw bits
+of all 61,706 weights of the model and prints its first 12 hex digits. Changing a single
+bit of a single weight gives a completely different hash. Two runs with the same hash
+therefore have bit-identical weights, and two runs with different hashes differ somewhere,
+even if only in the last bit of one weight.
 
-- **Meaning:**
-  - **Ours** must show `MATCH` and `bit-reproducible: yes`. The earlier runs were made on four
-    GPUs (TITAN V, RTX 2080 Ti, A100, RTX 4070) with CUDA 12.4 to 13.0, so a new run that is
-    identical to all of them shows bit-reproducibility across hardware and software. The
-    comparison covers every recorded hash (initial weights, weights after each epoch,
-    outputs) and every logged loss, not only the final weights.
-  - **RepDL** is also reproducible, because it fixes the order of every sum, but slower:
-    about 5 times on cuda2 and cuda3, less on cuda5.
-  - **Standard PyTorch** is the fastest but gives different weights on almost every run,
-    which is the problem this project addresses.
-  - Test accuracy is about 98% for all three, so reproducibility costs no accuracy.
+**What the TA sees.** After each of the three runs, the script prints the test accuracy, the
+time per training step and the weight hash. It then compares the run with two things:
 
-  The full log of each run is in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`.
+- the **reference hash**, our seed-0 result recorded in the report (`6b8ce5843c58`), and
+- **all earlier runs of the same setting** included in `results/`. These were made on four
+  GPUs (TITAN V, RTX 2080 Ti, A100, RTX 4070) with CUDA 12.4 to 13.0. Two runs count as
+  identical only if every recorded hash (initial weights, weights after each epoch, model
+  outputs) and every logged loss are identical.
+
+Example output on the TITAN V:
+
+```
+[cuda3 cuda124] repro_quick_20261201_101500
+  Ours, seed 0, batch 100: test accuracy 98.26%, 4.34 ms per step, final weights 6b8ce5843c58
+    reference hash 6b8ce5843c58: MATCH
+    identical to 35 of 35 earlier runs of this setting (8 GPU / CUDA configurations)
+    bit-reproducible: yes
+[cuda3 cuda124] repdl_quick_20261201_101530
+  RepDL, seed 0, batch 100: test accuracy 97.76%, 14.86 ms per step, final weights f3b851eed7b7
+    identical to 32 of 32 earlier runs of this setting (8 GPU / CUDA configurations)
+    bit-reproducible: yes
+[cuda3 cuda124] stock_quick_20261201_101600
+  Standard PyTorch, seed 0, batch 100: test accuracy 97.91%, 2.05 ms per step, final weights a823d48e018c
+    differs from 32 of 32 earlier runs of this setting
+    not reproducible, as expected for standard PyTorch
+```
+
+**How to read it.**
+
+| Method | Expected result | What it shows |
+|---|---|---|
+| Ours | Hash `6b8ce5843c58`, `MATCH`, identical to all earlier runs, `bit-reproducible: yes` | The weights are bit-identical to our runs on four GPU generations and three CUDA versions: training is reproducible across hardware and software. |
+| RepDL | Hash `f3b851eed7b7`, identical to all earlier runs | RepDL is also reproducible, because it fixes the order of every sum, but it is slower than ours (about 5 times on cuda2 and cuda3, less on cuda5). |
+| Standard PyTorch | A new hash, different from earlier runs | Standard PyTorch is not reproducible, even on the same GPU. This is the problem the project solves. |
+
+Test accuracy is about 98% for all three, so reproducibility costs no accuracy. Our time per
+step is somewhat higher than standard PyTorch's. Timings vary with the GPU and with other
+jobs on the server, whereas the hashes must not.
+
+**If our run shows `MISMATCH` or `bit-reproducible: NO`**, its weights differ from the report,
+and the script ends with "Some runs failed or were not reproducible". The full log of each
+run is in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`, with the loss every 100
+steps, the hash after each epoch and the accuracies.
 
 ### Step 3. Summarize
 
