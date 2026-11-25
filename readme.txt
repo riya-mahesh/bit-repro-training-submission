@@ -47,7 +47,7 @@ definition (*_cpu.h or *_math.cuh) and a GPU test (test_*.cu) comparing the two 
     tmux                                     # optional: keeps runs alive if ssh drops
 
     # get the code (or unzip the submission) and enter it
-    cd bit-reproducible-training
+    cd bit-repro-training-submission
 
     # all environments, builds and caches go to scratch (local to each server)
     export REPRO_WORK=/scratch/$USER/repro
