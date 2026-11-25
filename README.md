@@ -1,256 +1,246 @@
-# Bit-Reproducible Neural-Network Training on GPUs
+# Bit-reproducible LeNet-5 training
 
-This code trains LeNet-5 on MNIST so that the final weights are bit-identical on every GPU
-and CUDA version, without fixing the order of floating-point additions. Every sum is
-computed exactly in integer arithmetic and rounded once to FP32, exp and log are correctly
-rounded, and the remaining operations (max pooling, Adam, initialization) follow fixed
-rules. No kernel uses atomic operations. The baselines are RepDL (fixed-order reproducible
-training) and standard PyTorch.
+This submission contains non-atomic CUDA kernels, PyTorch bindings, LeNet-5/MNIST
+experiments, and 323 archived training records. The included runs agree in the
+recorded hashes for our method across the eight GPU/software configurations below.
+This is evidence for these tested configurations, not a guarantee for all hardware,
+CUDA versions, inputs, or neural networks.
 
-The scripts rebuild everything from source on the NYU CIMS GPU servers, run the correctness
-tests, repeat the experiments of the report, and write [`RESULTS.md`](RESULTS.md).
+The convolution code is the original whole-batch non-atomic implementation used
+for the archived measurements. It does **not** include the eight-image chunked
+weight-gradient experiment from the earlier `Submit_version` directory. Do not mix
+measurements from that implementation into this submission's performance tables.
 
-**Quick check** on one CIMS GPU server, about 15 minutes (details in [section 3](#3-quick-start-on-cims-about-15-minutes)):
+## Train MNIST directly on CIMS
 
-```bash
-export REPRO_WORK=/scratch/$USER/repro PYTHON=python3.12
-bash scripts/setup_env.sh cuda124                # install CUDA 12.4, PyTorch and RepDL (once per server)
-QUICK=1 bash scripts/run_experiments.sh cuda124  # train once per method: our weights hash to 6b8ce5843c58...
-python3 scripts/summarize.py                     # verdict in RESULTS.md: "reproducible ... yes"
-```
-
-## 1. Folder layout
-
-| Folder / file | Contents |
-|---|---|
-| `repro_gemm_cuda/` | Matrix multiplication (fully connected layers): power-of-two scales, 21-bit integers split into int8 digits, exact INT64 sums |
-| `repro_conv_cuda/` | Convolution forward, weight gradient and input gradient, read directly from the image (no im2col) |
-| `repro_sum_cuda/` | Exact sums of FP32 values (bias gradients, means) and the fixed warp-shuffle reduction tree used by every kernel |
-| `repro_math_cuda/` | Correctly rounded exp and log, softmax and cross-entropy |
-| `repro_nn_cuda/` | Max pooling (first maximum wins) and Adam (fixed IEEE operations) |
-| `repro_torch/` | PyTorch layers on top of these kernels, and the MNIST experiment (`mnist_repro.py`), which also runs RepDL and standard PyTorch |
-| `scripts/` | Setup, tests, experiments and the results summary |
-| `results/` | The raw record of every run in the report, one folder per server and CUDA version (`a100_cuda124/profiling` has the Nsight Compute profile) |
-| `RESULTS.md` | Summary tables of all runs in `results/` (written by `scripts/summarize.py`) |
-
-Each kernel folder has the GPU code (`.cu`, `.cuh`), an exact CPU version of the same
-definition (`*_cpu.h` or `*_math.cuh`) and a GPU test (`test_*.cu`) comparing the two bit
-for bit.
-
-## 2. Requirements
-
-- An NVIDIA GPU of compute capability 6.1 or newer. On CIMS: cuda2 (RTX 2080 Ti), cuda3
-  (TITAN V) or cuda5 (RTX 4070).
-- A CUDA toolkit module (cuda-12.4, cuda-12.6 or cuda-13.0), Python 3.10 or newer with
-  venv and pip, git, and internet access for pip, RepDL and the MNIST files.
-- Several GB of disk per configuration, outside the 4 GB CIMS home quota (`/scratch`).
-- Do not compile with `--use_fast_math`: the results depend on exact IEEE arithmetic.
-
-The scripts install everything else: PyTorch, numpy and RepDL (`setup_env.sh`), and the
-MNIST files, which are downloaded on the first run.
-
-## 3. Quick start on CIMS (about 15 minutes)
-
-The quick start checks the main claim of the report on one GPU: training with our kernels
-gives exactly the same weights as all our earlier runs on other GPUs and CUDA versions.
-
-### Step 0. Log in and prepare
+From the repository root in Bash, select the workspace containing your environment.
+The example uses the launcher's default workspace and CUDA 12.6. If you installed
+under another directory, use that directory as `REPRO_WORK`.
 
 ```bash
-ssh -J <netid>@access.cims.nyu.edu <netid>@cuda2.cims.nyu.edu    # or cuda3 / cuda5
-tmux                                     # optional: keeps runs alive if ssh drops
-nvidia-smi                               # check that GPU 0 is free (else use GPU=1)
-cd bit-repro-training-submission         # the unzipped submission
-export REPRO_WORK=/scratch/$USER/repro   # environments and builds go to scratch
-export PYTHON=python3.12                 # any Python >= 3.10
+export REPRO_WORK="/scratch/$USER/bit-repro-final/$(hostname -s)"
+module load python-3.12
+export PYTHON="$(command -v python3.12)"
+unset REPRO_VENV
+
+if [ ! -d "$REPRO_WORK/envs/cuda126" ]; then
+  bash scripts/setup_env.sh cuda126
+fi
+
+# Activate the environment and compile the extension for this session.
+source scripts/common.sh
+load_config cuda126 && build_repro
 ```
 
-### Step 1. Install the software (once per server, about 10 minutes)
+After a successful build, choose one command in the same terminal:
 
 ```bash
-bash scripts/setup_env.sh cuda124
+python3 repro_torch/mnist_repro.py --device cuda --mode repro
+python3 repro_torch/mnist_repro.py --device cuda --mode stock
+python3 repro_torch/mnist_repro.py --device cuda --mode repdl
+python3 repro_torch/mnist_repro.py --help
 ```
 
-- **Why:** creates a Python environment with CUDA 12.4, PyTorch 2.6.0, numpy and RepDL (the
-  baseline) at the exact versions used in the report.
-- **Expect:** the last line is `Ready: cuda124`.
+For CUDA 12.4, use `cuda124` for both setup and loading. See
+[CIMS_RUN_GUIDE.txt](CIMS_RUN_GUIDE.txt) for reusing a previous build, saving a
+single run, and running the CUDA tests independently.
 
-### Step 2. Train LeNet-5 on MNIST once with each method (about 2 minutes)
+## Run on cuda2, cuda3, and cuda5
+
+Enter the extracted repository directory on each CIMS server. You can use tmux to keep the run active after disconnecting.
 
 ```bash
-QUICK=1 bash scripts/run_experiments.sh cuda124
+nvidia-smi                           # choose a free GPU
+bash scripts/run_all.sh
 ```
 
-**What it does.** Trains LeNet-5 for 2 epochs (seed 0, batch size 100) three times: with
-our kernels, with RepDL and with standard PyTorch. All three start from the same initial
-weights and see the same data in the same order, so any difference in the result comes
-from the arithmetic alone.
+To choose the second GPU, use `GPU=1 bash scripts/run_all.sh`.
+The launcher runs configurations sequentially:
 
-**What is the hash.** After training, the script computes a SHA-256 hash over the raw bits
-of all 61,706 weights of the model and prints its first 12 hex digits. Changing a single
-bit of a single weight gives a completely different hash. Two runs with the same hash
-therefore have bit-identical weights, and two runs with different hashes differ somewhere,
-even if only in the last bit of one weight.
-
-**Expected output.** After each of the three runs, the script prints the test accuracy, the
-time per training step and the weight hash. It then compares the run with two things:
-
-- the **reference hash**, our seed-0 result recorded in the report (`6b8ce5843c58`), and
-- **all earlier runs of the same setting** included in `results/`. These were made on four
-  GPUs (TITAN V, RTX 2080 Ti, A100, RTX 4070) with CUDA 12.4 to 13.0. Two runs count as
-  identical only if every recorded hash (initial weights, weights after each epoch, model
-  outputs) and every logged loss are identical.
-
-For example, on the TITAN V:
-
-```
-[cuda3 cuda124] repro_quick_20261201_101500
-  Ours, seed 0, batch 100: test accuracy 98.26%, 4.34 ms per step, final weights 6b8ce5843c58
-    reference hash 6b8ce5843c58: MATCH
-    identical to 35 of 35 earlier runs of this setting (8 GPU / CUDA configurations)
-    bit-reproducible: yes
-[cuda3 cuda124] repdl_quick_20261201_101530
-  RepDL, seed 0, batch 100: test accuracy 97.76%, 14.86 ms per step, final weights f3b851eed7b7
-    identical to 32 of 32 earlier runs of this setting (8 GPU / CUDA configurations)
-    bit-reproducible: yes
-[cuda3 cuda124] stock_quick_20261201_101600
-  Standard PyTorch, seed 0, batch 100: test accuracy 97.91%, 2.05 ms per step, final weights a823d48e018c
-    differs from 32 of 32 earlier runs of this setting
-    not reproducible, as expected for standard PyTorch
-```
-
-**How to read it.**
-
-| Method | Expected result | What it shows |
+| Server | GPU | Default configurations |
 |---|---|---|
-| Ours | Hash `6b8ce5843c58`, `MATCH`, identical to all earlier runs, `bit-reproducible: yes` | The weights are bit-identical to our runs on four GPU generations and three CUDA versions: training is reproducible across hardware and software. |
-| RepDL | Hash `f3b851eed7b7`, identical to all earlier runs | RepDL is also reproducible, because it fixes the order of every sum, but it is slower than ours (about 5 times on cuda2 and cuda3, less on cuda5). |
-| Standard PyTorch | A new hash, different from earlier runs | Standard PyTorch is not reproducible, even on the same GPU. This is the problem the project solves. |
+| cuda2 | RTX 2080 Ti | CUDA 12.4 / PyTorch 2.6.0; CUDA 12.6 / PyTorch 2.7.1 |
+| cuda3 | TITAN V | CUDA 12.4 / PyTorch 2.6.0; CUDA 12.6 / PyTorch 2.7.1 |
+| cuda5 | RTX 4070 | CUDA 12.4 / PyTorch 2.6.0; CUDA 12.6 / PyTorch 2.7.1; CUDA 13.0 / PyTorch 2.9.0 |
 
-Test accuracy is about 98% for all three, so reproducibility costs no accuracy. Our time per
-step is somewhat higher than standard PyTorch's. Timings vary with the GPU and with other
-jobs on the server, whereas the hashes must not.
+This reproduces the CIMS configuration matrix in the archived report. cuda2 can
+optionally run CUDA 13.0 with a valid environment and compatible driver, but that
+combination is not in the archived results. TITAN V cannot be compiled by CUDA 13.
 
-**If our run shows `MISMATCH` or `bit-reproducible: NO`**, its weights differ from the report,
-and the script ends with "Some runs failed or were not reproducible". The full log of each
-run is in `results/<host>_cuda124/mnist/<method>_quick_<time>.txt`, with the loss every 100
-steps, the hash after each epoch and the accuracies.
+On cuda4, use `bash scripts/run_cuda4.sh` for CUDA 12.4 and 12.6. It disables Nsight profiling.
 
-### Step 3. Summarize
+The launcher:
+
+1. Finds a complete existing environment under `REPRO_ENV_ROOT`, the new workspace,
+   `/scratch/$USER/bit-repro-<host>/envs`, or `/scratch/$USER/bit-repro/envs`.
+   It also recognizes cuda2's legacy CUDA 12.4 `bit-repro/venv`.
+2. If no matching environment exists, creates one in the new workspace only when
+   at least 10 GiB is free. This threshold provides installation headroom, not a
+   guarantee against other users consuming shared disk space. It never deletes an
+   existing environment. Low space or missing packages cause an actionable failure.
+3. Verifies the selected Python, Torch runtime, nvcc version, and GPU visibility.
+4. Runs GPU correctness tests, full training experiments, and Nsight profiling.
+5. Checks each completed training record against the full archived reference hash
+   and available runs, then writes a summary after all configurations finish.
+
+Use an idle GPU and a valid allocation where required. The script does not stop
+other jobs. Nsight performance-counter access must be enabled by the server.
+Disk space is needed for builds even when environments already exist.
+
+Optional overrides:
+
+```bash
+# Only one configuration; no reinstall if an existing environment is valid.
+CONFIGS=cuda126 bash scripts/run_all.sh
+
+# Existing environments in a different directory (contains cuda124/, cuda126/, ...).
+REPRO_ENV_ROOT=/path/to/envs bash scripts/run_all.sh
+
+# Use an approved filesystem with more space for new environments/builds.
+REPRO_WORK=/path/with/space/bit-repro/cuda2 bash scripts/run_all.sh
+
+# Explicitly skip Nsight if counters are unavailable. This leaves profiling incomplete.
+NCU=0 bash scripts/run_all.sh
+```
+
+A full protocol has 40 training runs per configuration, plus correctness tests and
+profiling. Runtime depends on hardware, contention, and profiler replay overhead;
+there is no fixed completion-time promise. Detach from tmux with Ctrl+B, then D.
+
+## Where results go
+
+Packaged historical measurements remain unchanged under `results/`.
+By default, suite executions write the following files under `runs/`. Set `RESULTS_ROOT` to select another directory.
+
+```text
+runs/<host>/<cuda-tag>/<UTC-run-id>/
+  tests/tests.log
+  mnist/*.json and *.txt
+  logs/*.log
+  environment.txt
+  training_status.txt
+  profiling/conv_batch100.ncu-rep and .txt
+  profiling/conv_batch500.ncu-rep and .txt
+  profiling/status.txt
+```
+
+Each launch has a new run ID. Existing run directories are not overwritten.
+The launcher writes `runs/<host>/RESULTS_<run-id>.md`; it includes completed records
+under that host, including earlier reruns, and lists minimum protocol coverage.
+`COMPLETE` status plus the coverage table should be checked before treating a run
+as complete. A crash may leave `RUNNING` or `INCOMPLETE`; neither means success.
+Download the entire run directory. Environments/build caches are not result files.
+
+To summarize only a selected results tree:
+
+```bash
+python3 scripts/summarize.py runs/cuda3 runs/cuda3/summary.md
+```
+
+To regenerate the archived report without a GPU or third-party Python packages:
 
 ```bash
 python3 scripts/summarize.py
-cat RESULTS.md
 ```
 
-- **Why:** combines the new runs with the included results of the report and checks them.
-- **Expect:** the last line `Our runs are bit-reproducible and match the reference hashes:
-  yes`. In the Reproducibility table, ours and RepDL are "identical within every setting"
-  and standard PyTorch is "every run different".
-- **Meaning:** the new runs agree bit for bit with all earlier runs of the same setting. The
-  other tables (accuracy, speed, time per phase, batch-size scaling, memory) are those of
-  the report, with the new runs' timings included ([section 5](#5-what-the-summary-reports)).
+The summary ignores shortened training records. It reports incomplete protocol
+coverage; matching hashes alone do not prove that every required run was collected.
+Reference checks use full SHA-256 values; output may abbreviate hashes for display.
+Hashes provide strong empirical evidence of agreement, not a mathematical proof of
+collision-free equality or general correctness.
 
-### Other CUDA versions
+## Experiment definition
 
-Repeat steps 1-3 with `cuda126` (CUDA 12.6, PyTorch 2.7.1) or `cuda130` (CUDA 13.0, PyTorch
-2.9.0, cuda2 and cuda5 only, since CUDA 13 dropped the TITAN V). The expected output is the
-same, including our hash `6b8ce5843c58...`, which shows that the result does not depend on
-the CUDA version either. The same holds on another server.
+All modes use LeNet-5, MNIST, Adam with learning rate 0.01, two epochs, three slices
+for our fixed-point layers, and seeds 0–4. Initialization and epoch permutations are
+generated deterministically by the supplied code; this is **not** a no-shuffle run.
+The same input order and initial weights are used across the three methods.
 
-The quick runs are saved under new names and never overwrite the included results. To
-return to the submitted state, delete the `*_quick_*` files in `results/` and run
-`python3 scripts/summarize.py` again.
+The full protocol runs seed 0 three times per method; seeds 1–4 once per method;
+one synchronized phase-timing run per method; and batches 50, 200, 500 and 1000 twice
+for our method and standard PyTorch. Baselines are RepDL (commit `acd95bb`) and
+ordinary PyTorch. RepDL is required; the full protocol cannot silently skip it.
 
-## 4. Full reproduction (as in the report)
+`RESULTS.md` reports runtime, phase timings, batch scaling, allocated GPU memory,
+final accuracy, and agreement of hashes, epoch test accuracies, and final loss.
+It does not compare every activation or every minibatch loss. Timing excludes the
+first five steps and uses medians; phase-timing runs add synchronization and are
+excluded from aggregate step timings. Peak memory includes the GPU-resident dataset
+and is the PyTorch allocator's peak allocated memory, not total device usage.
 
-On each server and for each CUDA version, create the environment once and run the full
-protocol (about 20 minutes per configuration):
+## Evidence and limitations
+
+The 323 JSON records and accompanying text were copied byte-for-byte from the
+original non-atomic experiment archives.
+The three convolution source files match the original repository exactly.
+
+The archived matrix contains cuda2 (12.4, 12.6), cuda3 (12.4, 12.6), cuda5 (12.4,
+12.6, 13.0), and A100 with a CUDA 12.4 PyTorch wheel. The latter's recorded compiler
+was **nvcc 12.6.77**: its `cuda124` label denotes the runtime, not a matched 12.4
+compiler/runtime configuration. Later A100 12.6/13.0 runs are not packaged here.
+
+CUDA and PyTorch versions change together, so these experiments do not isolate the
+effect of CUDA alone. Cross-device agreement is portability evidence; batch-size
+experiments measure workload scaling, not distributed multi-GPU scaling. Accuracy
+after two epochs is not a general convergence or accuracy-equivalence proof. CPU
+training results and larger-model training are not included. Report performance
+per GPU/configuration rather than one universal speedup. Shared-server contention
+can affect timing, especially when comparing runs made at different times.
+
+The packaged A100 text reports cover forward/GEMM and a general sample at batch
+100, plus weight gradients at batches 100 and 500. They **do not** include batch-500
+Conv1/Conv2 filter scales or Conv2 forward. CIMS Nsight binaries are not included.
+These gaps must not be described as measured comparisons.
+
+The updated profiling script captures both layers' forward, filter-scale, and
+weight-gradient kernels at batches 100 and 500. It validates six launches and their
+duration metrics; empty captures and report-export errors fail the run. These new
+captures must actually be run on a GPU before claiming the gaps have been filled.
+They are samples for diagnosis, not full training timelines or proof of the cause
+of every timing trend. Do not use training times printed inside an ncu invocation
+as normal benchmark timings.
+
+## Profiling an existing CUDA 12.6 installation
+
+Run from the repository root. Set `REPRO_WORK` to the workspace you used for
+setup. For the default CIMS launcher workspace, use:
 
 ```bash
-export REPRO_WORK=/scratch/$USER/repro
-export PYTHON=python3.12
-
-bash scripts/setup_env.sh cuda124
-bash scripts/run_experiments.sh cuda124
-
-bash scripts/setup_env.sh cuda126     # then run_experiments.sh with cuda126
-bash scripts/setup_env.sh cuda130     # cuda2 and cuda5 only: CUDA 13.0 has no Volta support
+export REPRO_WORK="/scratch/$USER/bit-repro-final/$(hostname -s)"
+unset REPRO_VENV
+bash scripts/profile_kernels.sh cuda126
 ```
 
-Configurations used in the report: TITAN V (cuda3) with CUDA 12.4 and 12.6, RTX 2080 Ti
-(cuda2) with CUDA 12.4 and 12.6, RTX 4070 (cuda5) with CUDA 12.4, 12.6 and 13.0, and an
-A100 on the NYU HPC cluster ([section 6](#6-the-a100-on-the-nyu-hpc-cluster)).
+The script reads `$REPRO_WORK/envs/cuda126/config`, loads the CUDA module
+recorded during setup, and activates `$REPRO_WORK/envs/cuda126`. If you
+intentionally keep builds and environments in separate workspaces, set
+`REPRO_VENV` to the existing venv directory before invoking the script.
 
-The full protocol on one GPU trains each method with seed 0 three times and seeds 1-4 once
-at batch size 100, once more with a timer around the forward pass, backward pass and
-optimizer, and ours and standard PyTorch twice at batch sizes 50, 200, 500 and 1000. All
-methods use the same data, batch order and initial weights.
+For ordinary MNIST training, see [the standalone Python instructions](CIMS_RUN_GUIDE.txt)
+(sections 1–3 and 5). The command above runs Nsight kernel profiling.
 
-Optional kernel profile of the convolution weight gradient (needs Nsight Compute with access
-to the GPU performance counters, which CIMS may not grant):
+This builds the original non-atomic extension and captures the two batch sizes;
+it does not repeat the 40-run training protocol. To run tests or training separately,
+use `scripts/run_tests.sh cuda126` or `scripts/run_experiments.sh cuda126` with the
+same variables. `NCU=1` adds profiling to the latter. Individual commands get separate
+run IDs unless you explicitly export the same `RUN_ID` for them.
 
-```bash
-NCU=1 bash scripts/run_experiments.sh cuda124
-```
+For A100/Singularity, allocate a GPU and use a development image/toolkit matching
+the Torch wheel. Bind the source, workspace, and existing environment at their
+original absolute paths (venv activation scripts can contain those paths), set
+`CUDA_MODULE=''`, and use the individual scripts. The CIMS launcher is not an HPC
+scheduler. Do **not** label a new build CUDA 12.4 while compiling with nvcc 12.6;
+the scripts now reject that mismatch. Preparing HPC containers is site-specific.
 
-After all runs, on any of the servers, `python3 scripts/summarize.py` summarizes everything in
-`results/`. To combine runs from several servers, copy their `results/<host>_<config>/`
-folders into one `results/` folder first.
+## Code layout and local validation
 
-A full run on a server and CUDA version that is already in `results/` (for example cuda3
-with cuda124) replaces the included files of that folder. Keep a copy of `results/` first
-to compare against the originals.
+`repro_gemm_cuda/`: fixed-point digit GEMM; `repro_conv_cuda/`: direct convolution;
+`repro_sum_cuda/`: exact reductions; `repro_math_cuda/`: exp/log, softmax and loss;
+`repro_nn_cuda/`: pooling and Adam; `repro_torch/`: bindings and MNIST training;
+`scripts/`: environments, runners, checks and aggregation.
 
-## 5. What the summary reports
-
-`RESULTS.md` has one table per measurement:
-
-- **Reproducibility:** whether runs with the same seed and batch size agree in every hash
-  (initial weights, weights after each epoch, logits) and every logged loss, and whether our
-  final weights match the reference hashes in `scripts/summarize.py`.
-- **Accuracy** after 2 epochs (seeds 0-4).
-- **Speed:** median time per training step at batch size 100, speedup over RepDL and
-  overhead over standard PyTorch.
-- **Breakdown** into forward, backward and optimizer time.
-- **Batch-size scaling:** time per step at batch sizes 50 to 1000.
-- **Peak GPU memory.**
-
-Standard PyTorch is expected to give different weights in every run: it is the speed and
-accuracy reference, not a reproducible method. RepDL is reproducible but slower.
-
-## 6. The A100 on the NYU HPC cluster
-
-There the GPU is used inside a CUDA development container, with an existing Python
-environment that has PyTorch 2.6.0 (CUDA 12.4 wheel), numpy and RepDL. On a node with an
-allocated A100, from the repository folder:
-
-```bash
-singularity exec --nv --bind "$PWD:/work" --bind /path/to/venv:/venv --pwd /work \
-    /share/apps/images/cuda12.6.2-cudnn9.5.0-devel-ubuntu24.04.1.sif /bin/bash --noprofile --norc
-
-# inside the container
-export REPRO_WORK=/work/.work REPRO_VENV=/venv
-export CXX=/usr/bin/g++ CC=/usr/bin/gcc LDSHARED='/usr/bin/g++ -shared -pthread -B/usr/bin/'
-export LD_PRELOAD=$(/usr/bin/g++ -print-file-name=libstdc++.so.6)
-bash scripts/run_experiments.sh cuda124
-python3 scripts/summarize.py
-```
-
-The compiler settings make the extension build with the container's compiler and load with
-its C++ runtime. The container's nvcc (12.6) is newer than the wheel's CUDA (12.4), which
-only produces a version warning. Results go to `results/<node>_cuda124/`.
-
-## 7. Running pieces by hand
-
-```bash
-source $REPRO_WORK/envs/cuda124/bin/activate && module load cuda-12.4
-cd repro_torch && python3 setup.py build_ext --inplace
-python3 mnist_repro.py --mode repro          # ours
-python3 mnist_repro.py --mode stock          # standard PyTorch
-python3 mnist_repro.py --mode repdl          # RepDL
-python3 mnist_repro.py --help                # seed, batch size, epochs, profiling
-```
-
-Without a GPU, `mnist_repro.py` also runs on the CPU (`--device cpu`) with the exact CPU
-versions of the kernels, and gives the same hashes.
+Kernel tests compare the GPU implementation with CPU implementations of the same
+numerical definitions. Passing them does not mean quantized GEMM equals an exact
+real-valued dot product. No numerical kernels or training arithmetic were changed
+when preparing this package. Release validation on the local Mac covers scripts,
+archived records and report generation; it is not a fresh CUDA execution.

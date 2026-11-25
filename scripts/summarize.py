@@ -25,14 +25,10 @@ ARGS = [] if CHECK else sys.argv[1:]
 SRC = ARGS[0] if len(ARGS) > 0 else os.path.join(ROOT, "results")
 DST = ARGS[1] if len(ARGS) > 1 else os.path.join(ROOT, "RESULTS.md")
 
-# Final weights (after epoch 2) of our method, by (seed, batch size). They are the same on every
-# GPU and CUDA version; a different value means the arithmetic changed.
-EXPECTED = {
-    (0, 50): "2ecd0e5156ce", (0, 100): "6b8ce5843c58", (0, 200): "8abbccf6ec9d",
-    (0, 500): "6e2ad4e4cf7e", (0, 1000): "1ab462c2a075",
-    (1, 100): "c955a8b61852", (2, 100): "20eea7769625", (3, 100): "7ad32ff9c8b3",
-    (4, 100): "f5347082020d",
-}
+# Final weights (after epoch 2) of our method, by (seed, batch size). These match the included
+# archived runs. A mismatch requires investigation; this is not a universal hardware guarantee.
+EXPECTED = {(0, 50): '2ecd0e5156ceba1eb8acf8fd58db1302516202c09438321ae2f3cc95347b552d', (0, 100): '6b8ce5843c58dcd10a95e3339e634b66f95989e2972cc475427c8fb7b83ab2f2', (0, 200): '8abbccf6ec9d21efde0dbb4803fa1ed196f734cec2a150bb3d06b94a1028143a', (0, 500): '6e2ad4e4cf7e3a4625d8514db8148f7479112890c6b2e6f790312909040f47f4', (0, 1000): '1ab462c2a0758fefa225c67dd4cf6a821e9ca2baf3c193f9a627c44b414cfb19', (1, 100): 'c955a8b6185235b4d2fa1de6b684f150f6a7609cdfd6d30a69546fa9b46dc13d', (2, 100): '20eea77696252215c07bc76b2b63b79b42595af41efc799e2a2727fc3cc243e5', (3, 100): '7ad32ff9c8b31c5e3aac33777daea93e3f75dde0c7f8841645e37c99bc1012a3', (4, 100): 'f5347082020d6df0f67e70afbe1c2e53891523fd08d2bce0922bb1dbf2bb9929'}
+
 METHODS = [("repro", "Ours"), ("repdl", "RepDL"), ("stock", "Standard PyTorch")]
 GPU_ORDER = ["TITAN V", "RTX 2080 Ti", "A100", "RTX 4070"]
 
@@ -47,12 +43,16 @@ def gpu(device):
 def record(f):
     try:
         d = json.load(open(f))
-    except ValueError:
-        return None
+    except (ValueError, OSError) as exc:
+        raise ValueError("Unreadable run record: " + f) from exc
     if "mode" not in d or "hashes" not in d:
-        return None
+        raise ValueError("Invalid run record: " + f)
     if d.get("steps") != d.get("epochs", 0) * (60000 // d.get("batch", 1)):
         return None                      # a shortened test run, not a full training run
+    if d.get("epochs") != 2 or d.get("slices") != 3 or d.get("lr") != 0.01:
+        raise ValueError("Unsupported training protocol in " + f)
+    if "weights_epoch_2" not in d["hashes"]:
+        raise ValueError("Missing final-weight hash in " + f)
     d["gpu"] = gpu(d["device"])
     tag = d.get("tag") or ""
     if not re.fullmatch(r"cuda\d+", tag):  # a custom run label: use the CUDA version instead
@@ -62,8 +62,8 @@ def record(f):
     return d
 
 
-def load():
-    files = sorted(glob.glob(os.path.join(SRC, "**", "mnist", "*.json"), recursive=True))
+def load(source=SRC):
+    files = sorted(glob.glob(os.path.join(source, "**", "mnist", "*.json"), recursive=True))
     return [d for d in map(record, files) if d]
 
 
@@ -78,8 +78,8 @@ def cuda_name(tag):
 
 
 def fingerprint(d):
-    # Every hash the run recorded (initial and final weights, logits) and every logged loss.
-    return json.dumps([d["hashes"], d.get("curve")], sort_keys=True)
+    # All recorded hashes, epoch test accuracies, and the final recorded loss.
+    return json.dumps([d["hashes"], d.get("curve"), d.get("final_loss")], sort_keys=True)
 
 
 def med(xs):
@@ -102,10 +102,12 @@ def check(path):
     if not d:
         sys.exit("not a complete training run: " + path)
     name = dict(METHODS)[d["mode"]]
-    h = d["hashes"]["weights_epoch_2"][:12]
+    h = d["hashes"]["weights_epoch_2"]
     print("  %s, seed %d, batch %d: test accuracy %.2f%%, %.2f ms per step, final weights %s"
-          % (name, d["seed"], d["batch"], 100 * d["test_accuracy"], d["step_ms_median"], h))
-    others = [r for r in load() if r["file"] != d["file"] and r["mode"] == d["mode"]
+          % (name, d["seed"], d["batch"], 100 * d["test_accuracy"], d["step_ms_median"], h[:12]))
+    sources = {os.path.abspath(SRC), os.path.abspath(os.environ.get("RESULTS_ROOT", os.path.join(ROOT, "runs")))}
+    previous = {r["file"]: r for source in sources for r in load(source)}
+    others = [r for r in previous.values() if r["file"] != d["file"] and r["mode"] == d["mode"]
               and r["seed"] == d["seed"] and r["batch"] == d["batch"]]
     same = [r for r in others if fingerprint(r) == fingerprint(d)]
     nconf = len({r["config"] for r in same})
@@ -122,9 +124,14 @@ def check(path):
               % (len(same), len(others), nconf))
         ok = ok and len(same) == len(others)
     if d["mode"] == "stock":
-        print("    not reproducible, as expected for standard PyTorch")
+        if not others:
+            print("    reproducibility: insufficient comparison data")
+        elif len(same) == len(others):
+            print("    recorded outputs match the available comparison runs")
+        else:
+            print("    recorded outputs differ across the available comparison runs")
     elif ok:
-        print("    bit-reproducible: yes")
+        print("    recorded outputs match available comparisons; reference check passed where applicable")
     else:
         print("    bit-reproducible: NO")
     sys.exit(0 if ok else 1)
@@ -153,8 +160,8 @@ def main():
     # ---------------- reproducibility ----------------
     md += ["## Reproducibility", "",
            "A setting is a (seed, batch size) pair. Runs agree only if every recorded hash (initial",
-           "weights, weights after each epoch, logits) and every logged loss is identical.", ""]
-    ok = True
+           "weights, weights after each epoch, logits), epoch test accuracies, and final loss match.", ""]
+    ok = any(d["mode"] == "repro" for d in runs)
     rows = []
     for mode, name in METHODS:
         groups = collections.defaultdict(list)
@@ -169,9 +176,11 @@ def main():
         ref = ""
         if mode == "repro":
             wrong = [k for k, v in groups.items() if k in EXPECTED
-                     and any(d["hashes"]["weights_epoch_2"][:12] != EXPECTED[k] for d in v)]
+                     and any(d["hashes"]["weights_epoch_2"] != EXPECTED[k] for d in v)]
             ref = "all match" if not wrong else "MISMATCH for %s" % sorted(wrong)
             ok = ok and same and not wrong
+        if mode == "repdl":
+            ok = ok and same
         verdict = "identical within every setting" if same else \
             ("%d different results in %d runs" % (distinct, n) if distinct < n else "every run different")
         rows.append([name, n, len(groups), len({d["config"] for v in groups.values() for d in v}), verdict, ref or "–"])
@@ -231,7 +240,7 @@ def main():
         md += [table(["GPU", "CUDA", "Method", "Forward", "Backward", "Optimizer"], rows), ""]
 
     # ---------------- batch scaling ----------------
-    batches = sorted({d["batch"] for d in timed})
+    batches = sorted({d["batch"] for d in timed}) or sorted({d["batch"] for d in runs})
     if len(batches) > 1:
         md += ["## Batch-size scaling", "", "Median ms per step, ours / standard PyTorch (seed 0).", ""]
         cs = [c for c in configs if any(d["batch"] != 100 for d in timed if d["config"] == c)]
@@ -256,7 +265,34 @@ def main():
         rows = [r for i, r in enumerate(rows) if r not in rows[:i]]
     md += [table(["GPU", "CUDA", "Batch size", "Ours", "RepDL", "Standard PyTorch"], rows), ""]
 
-    md += ["## Verdict", "", "Our runs are bit-reproducible and match the reference hashes: **%s**." % ("yes" if ok else "NO"), ""]
+    md += ["## Protocol coverage", "",
+           "Minimum counts for the full protocol, per included configuration. This does not verify profiler captures.", ""]
+    coverage = []
+    for c in configs:
+        ds = [d for d in runs if d["config"] == c]
+        missing = []
+        for mode, _ in METHODS:
+            for seed in range(5):
+                n = sum(d["mode"] == mode and d["seed"] == seed and d["batch"] == 100
+                        and not d.get("profile") for d in ds)
+                if n < (3 if seed == 0 else 1): missing.append("%s seed%d" % (mode, seed))
+            if not any(d["mode"] == mode and d["batch"] == 100 and d.get("profile") for d in ds):
+                missing.append(mode + " phase timing")
+        for mode in ("repro", "stock"):
+            for b in (50, 200, 500, 1000):
+                if sum(d["mode"] == mode and d["seed"] == 0 and d["batch"] == b
+                       and not d.get("profile") for d in ds) < 2:
+                    missing.append("%s batch%d" % (mode, b))
+        coverage.append([c[0], cuda_name(c[1]), "complete" if not missing else "; ".join(missing)])
+    md += [table(["GPU", "CUDA runtime", "Training protocol"], coverage), ""]
+    md += ["## Scope and limitations", "",
+           "CUDA labels refer to the PyTorch runtime. The included historical A100 CUDA 12.4 records used nvcc 12.6; see README.md.",
+           "These tables establish agreement for the included settings, not every GPU, CUDA release or model.",
+           "CUDA and PyTorch versions both change between configurations; their effects are not isolated.",
+           "Accuracy after two epochs is not a general convergence guarantee. CPU training records are not included.",
+           "Only completed training records contribute. Coverage above must be checked before calling a rerun complete.",
+           "The included A100 batch-500 Nsight report covers weight gradients only; forward and filter-scale comparisons are missing.", ""]
+    md += ["## Verdict", "", "Our included runs match the full reference hashes and recorded outputs within each setting, and included RepDL runs agree: **%s**." % ("yes" if ok else "NO"), ""]
     open(DST, "w").write("\n".join(md))
     print("wrote", DST, "| reproducible and matching reference hashes:", "yes" if ok else "NO")
     sys.exit(0 if ok else 1)

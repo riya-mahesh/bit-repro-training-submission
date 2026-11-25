@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Builds repro_torch/_backend in place:
+# Optional in-place build: activate the chosen environment and cd into repro_torch/ first.
 #   python3 setup.py build_ext --inplace           GPU build if nvcc is on PATH, else CPU only
 #   REPRO_CPU_ONLY=1 python3 setup.py build_ext --inplace
 #   REPRO_ARCH=sm_75 python3 setup.py build_ext --inplace     instead of this machine's GPU

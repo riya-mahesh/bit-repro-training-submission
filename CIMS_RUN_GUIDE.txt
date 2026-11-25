@@ -1,0 +1,238 @@
+CIMS GPU TRAINING: SETUP, TESTS, SINGLE RUNS, AND EXPERIMENTS
+=========================================================
+
+These instructions describe the scripts in Submit_new. Commands assume Bash,
+an available NVIDIA GPU, and execution from the submitted repository root.
+Examples use cuda3 and CUDA 12.6. Replace the repository path for your account.
+No existing Python environment is required. Internet access is needed for
+dependencies, RepDL, and MNIST (unless the dataset is already downloaded).
+
+Choose a workflow; you do not need to run every section:
+  Single training run: sections 1, 2, 3, then 5.
+  CUDA correctness tests: sections 1, 2, then 4.
+  Full experiment suite: sections 1, 2, then 6.
+  Automatic setup + tests + experiments: sections 1, then 7.
+
+1. START A TERMINAL AND CHOOSE STORAGE
+------------------------------------
+Keep SSH connected until completion. tmux is optional.
+
+cd /home/hs5828/GPUs/Project_new/bit-repro-training-submission
+deactivate 2>/dev/null || true
+module load python-3.12
+module load cuda-12.6
+
+unset REPRO_VENV REPRO_ENV_ROOT CUDA_MODULE
+unset PYTHONPATH PYTHONHOME RUN_ID QUICK REPRO_BUILD
+export PYTHON="$(command -v python3.12)"
+export REPRO_WORK="/scratch/$USER/bit-repro-final/$(hostname -s)"
+export GPU=0
+export MAX_JOBS=4
+export PIP_NO_CACHE_DIR=1
+mkdir -p "$REPRO_WORK"
+
+nvidia-smi
+df -h "$REPRO_WORK"
+nvcc --version
+
+If you already installed under /scratch/$USER/bit-repro-cuda3, set REPRO_WORK
+to that existing workspace before continuing. Direct scripts read its envs/ directory.
+
+Use an idle GPU. If GPU 1 is available instead, run: export GPU=1
+The automatic launcher requires 10 GiB free before creating a missing environment.
+This is conservative installation headroom, not an exact final environment size.
+Manual setup does not enforce that threshold; it can still fail if space runs out.
+
+STORAGE OVERRIDES: /scratch IS NOT REQUIRED
+
+No script edits are necessary. Before setup or execution, choose a writable
+filesystem with sufficient quota and space, for example:
+
+export REPRO_WORK="$HOME/repro-work/$(hostname -s)"
+mkdir -p "$REPRO_WORK"
+
+Do not use home blindly: check its quota as well as df output. /tmp can be used
+for disposable builds, but may be automatically cleaned and is unsuitable for
+the only copy of an environment or results you need to preserve.
+
+REPRO_WORK controls:
+  Environments: $REPRO_WORK/envs/<configuration>/
+  Builds:       $REPRO_WORK/build/<host>/<configuration>/
+  Temp files:   $REPRO_WORK/tmp/
+  Pip cache:    $REPRO_WORK/pip-cache/ (caching normally disabled)
+
+Results are separate. The default is <repository>/runs/. To change it:
+
+export RESULTS_ROOT="$HOME/repro-results"
+
+To make a different workspace the default in scripts, edit the line starting
+'export REPRO_WORK=' in scripts/run_all.sh and, if used, scripts/run_cuda4.sh.
+scripts/common.sh requires REPRO_WORK; setup_env.sh derives its installation
+directory from it. run_tests.sh and run_experiments.sh use common.sh, so export
+REPRO_WORK when invoking them directly. Existing environment search paths in
+run_all.sh include older /scratch locations; REPRO_ENV_ROOT supplies the first
+search location, but is not an exclusive search restriction.
+
+For a SINGLE PYTHON RUN, activate the chosen environment and set REPRO_BUILD to
+the compiled package directory (sections 3 and 5). Python does not use REPRO_WORK
+to discover either one automatically. Point to existing paths; changing a variable
+does not move files. Recreate a venv at its new location rather than moving it.
+
+If you want persistent environments and disposable builds in separate places:
+  - Run setup with REPRO_WORK set to the persistent location.
+  - Set REPRO_VENV to that environment for load_config/direct script usage.
+  - Change REPRO_WORK to the build workspace before building or testing.
+For run_all.sh, set REPRO_ENV_ROOT to the persistent envs directory instead:
+the launcher clears REPRO_VENV while selecting each configuration.
+
+2. INSTALL THE CUDA 12.6 ENVIRONMENT ONCE
+----------------------------------------
+bash scripts/setup_env.sh cuda126
+
+Wait for 'Ready: cuda126 ...'. This installs PyTorch 2.7.1+cu126, NumPy, and
+RepDL, pinned by the setup script. It does not build our Python extension.
+Setup refuses to overwrite an existing environment. If already installed and
+valid, skip setup and reuse it. An incomplete directory must be handled before
+retrying; do not delete environments while jobs use them.
+
+3. BUILD OUR EXTENSION FOR DIRECT PYTHON USE
+-------------------------------------------
+Run these commands in the SAME Bash terminal that will run training:
+
+source scripts/common.sh
+load_config cuda126 && build_repro
+
+Only continue if the command succeeds. load_config selects/activates the
+environment and validates the versions and GPU. build_repro builds the extension,
+sets REPRO_BUILD, and verifies that the built backend supports CUDA.
+
+echo "Environment: $ENV_DIR"
+echo "Compiled package: $REPRO_BUILD"
+
+Save these paths if you want to reuse the build in a later terminal. The build
+directory is unique, such as .../build/cuda3/cuda126/build.ABC123.
+Building standalone CUDA test binaries in section 4 does not replace this step.
+
+4. COMPILE AND TEST THE CUDA KERNELS
+----------------------------------
+bash scripts/run_tests.sh cuda126
+
+Requires the environment from section 2. Builds and runs GEMM, convolution,
+sum, softmax, and neural-network CUDA tests, plus exhaustive exp/log hash tests.
+The final line should be OVERALL: PASS. Examine the log if it fails.
+
+Optional additional CPU math validation:
+bash scripts/run_tests.sh cuda126 --cpu-proof
+
+Outputs: runs/<host>/cuda126/<run-id>/tests/
+These tests validate the implemented checks; a PASS is not a universal proof of
+every numerical claim. In particular, expected exhaustive hashes check identity.
+
+5. ONE INDEPENDENT MNIST TRAINING RUN
+------------------------------------
+After section 3, in the same terminal:
+
+python3 repro_torch/mnist_repro.py \
+  --mode repro --device cuda \
+  --epochs 2 --batch 100 --seed 0 --slices 3 --lr 0.01
+
+No build, installation, correctness suite, comparison suite, or Nsight capture
+is triggered by this command. It reports hashes, accuracy, training timing and
+peak allocated GPU memory. --out is optional; without it no result txt/json
+files are saved.
+
+To save a run:
+
+SINGLE_OUT="${RESULTS_ROOT:-$PWD/runs}/$(hostname -s)/cuda126/manual_$(date -u +%Y%m%dT%H%M%SZ)_$$"
+mkdir -p "$SINGLE_OUT"
+python3 repro_torch/mnist_repro.py \
+  --mode repro --device cuda \
+  --epochs 2 --batch 100 --seed 0 --slices 3 --lr 0.01 \
+  --tag cuda126 --out "$SINGLE_OUT/repro.txt"
+
+This writes repro.txt and repro.json. It is a standalone result, not a complete
+experiment-suite directory with suite status and environment files.
+
+Useful options:
+  --mode stock    Run ordinary PyTorch.
+  --mode repdl    Run RepDL.
+  --seed 1        Use a different initialization.
+  --epochs 1 --max-steps 1   Execute a one-step smoke test.
+  --profile       Measure forward/backward/optimizer separately.
+
+--profile introduces synchronization: use it for phase breakdowns, not as the
+main end-to-end performance measurement. One step is not a useful benchmark.
+
+REUSING A SUCCESSFUL BUILD IN A NEW TERMINAL:
+
+module load python-3.12
+module load cuda-12.6
+source /actual/environment/path/bin/activate
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+export CUDA_VISIBLE_DEVICES=0
+export REPRO_BUILD=/actual/successful/build/path
+
+Replace both example paths with the paths printed in section 3, then run the
+Python command. Reuse only a build compatible with this GPU and environment.
+Builds made by bash run_all.sh do not export REPRO_BUILD back to the parent shell.
+
+6. RUN EXPERIMENTS WITH AN EXISTING ENVIRONMENT
+---------------------------------------------
+From the repository root, with section 1's variables configured:
+
+unset RUN_ID QUICK
+NCU=1 bash scripts/run_experiments.sh cuda126
+
+This builds our extension and runs the full 40-record experiment protocol:
+seed-0 repetitions for three methods; seeds 1-4; phase measurements; and batch
+50/200/500/1000 repeats for repro and stock. NCU=1 adds both convolution layers'
+forward, filter-scale, and weight-gradient captures at batches 100 and 500.
+It checks results against the reference. It does not run the CUDA test suite.
+
+Quick alternative: one two-epoch run per method, no Nsight:
+QUICK=1 NCU=0 bash scripts/run_experiments.sh cuda126
+
+Quick mode is three training runs, not one optimizer step, and does not establish
+repeatability. To request no profiling for the full suite use NCU=0 without QUICK.
+
+7. AUTOMATIC SETUP + TESTS + EXPERIMENTS + SUMMARY
+------------------------------------------------
+After section 1, the recommended single-configuration command is:
+
+CONFIGS=cuda126 NCU=1 bash scripts/run_all.sh
+
+It reuses a valid environment or creates one if none is found, builds/tests the
+CUDA code, builds our Python extension, runs experiments/profiling, and writes
+a summary. You do not need to run sections 2-6 first.
+
+For tests plus one training run per method, without Nsight:
+CONFIGS=cuda126 QUICK=1 NCU=0 bash scripts/run_all.sh
+
+For this server's full default configuration list:
+bash scripts/run_all.sh
+
+Current defaults:
+  cuda2: CUDA 12.4 and 12.6
+  cuda3: CUDA 12.4 and 12.6
+  cuda5: CUDA 12.4, 12.6, and 13.0
+Each configuration has its own environment. Do not select CUDA 13 for TITAN V.
+cuda4 uses the separate scripts/run_cuda4.sh, which disables Nsight on Maxwell.
+That cuda4 launcher unsets QUICK and therefore runs its full training protocol.
+
+8. WHERE OUTPUTS GO
+-------------------
+Default new results:
+  <repository>/runs/<host>/<configuration>/<run-id>/
+  <repository>/runs/<host>/RESULTS_<run-id>.md
+
+Suite directories include tests/, mnist/, logs/, and profiling/ as applicable.
+run_experiments.sh saves training_status.txt; expect COMPLETE for success.
+Archived earlier measurements remain in results/ and are not overwritten.
+REPRO_WORK controls work files, NOT result storage; RESULTS_ROOT controls results.
+
+Avoid keeping a manually exported RUN_ID for unrelated runs. Source common.sh
+sets and exports one in the current shell; run 'unset RUN_ID' before starting a
+new independent suite. Existing output subdirectories are protected against reuse.
+
+A fresh venv is not needed for every experiment. Reuse dependencies and rebuild
+the extension when source code, GPU target, or the software configuration changes.

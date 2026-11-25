@@ -20,7 +20,7 @@ over repeated runs. All runs train LeNet-5 on MNIST for 2 epochs with Adam (lear
 ## Reproducibility
 
 A setting is a (seed, batch size) pair. Runs agree only if every recorded hash (initial
-weights, weights after each epoch, logits) and every logged loss is identical.
+weights, weights after each epoch, logits), epoch test accuracies, and final loss match.
 
 | Method | Runs | Settings | Configurations | Result | Reference hashes |
 |---|---|---|---|---|---|
@@ -120,6 +120,30 @@ MiB, including the MNIST dataset held on the GPU (about 210 MiB).
 | RTX 4070 | 13.0 | 100 | 222 | 219 | 240 |
 | RTX 4070 | 13.0 | 1000 | 294 | – | 330 |
 
+## Protocol coverage
+
+Minimum counts for the full protocol, per included configuration. This does not verify profiler captures.
+
+| GPU | CUDA runtime | Training protocol |
+|---|---|---|
+| TITAN V | 12.4 | complete |
+| TITAN V | 12.6 | complete |
+| RTX 2080 Ti | 12.4 | complete |
+| RTX 2080 Ti | 12.6 | complete |
+| A100 | 12.4 | complete |
+| RTX 4070 | 12.4 | complete |
+| RTX 4070 | 12.6 | complete |
+| RTX 4070 | 13.0 | complete |
+
+## Scope and limitations
+
+CUDA labels refer to the PyTorch runtime. The included historical A100 CUDA 12.4 records used nvcc 12.6; see README.md.
+These tables establish agreement for the included settings, not every GPU, CUDA release or model.
+CUDA and PyTorch versions both change between configurations; their effects are not isolated.
+Accuracy after two epochs is not a general convergence guarantee. CPU training records are not included.
+Only completed training records contribute. Coverage above must be checked before calling a rerun complete.
+The included A100 batch-500 Nsight report covers weight gradients only; forward and filter-scale comparisons are missing.
+
 ## Verdict
 
-Our runs are bit-reproducible and match the reference hashes: **yes**.
+Our included runs match the full reference hashes and recorded outputs within each setting, and included RepDL runs agree: **yes**.

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Builds and runs the correctness tests of every kernel on one GPU (~5 minutes).
+# Builds and runs the CUDA correctness suite. Run from the repository root with
+# REPRO_WORK set and the selected environment installed.
 #
-#   bash scripts/run_tests.sh cuda124                 GPU tests
-#   bash scripts/run_tests.sh cuda124 --cpu-proof     also the CPU proof of exp and log over all
+#   bash scripts/run_tests.sh cuda126                 GPU tests
+#   bash scripts/run_tests.sh cuda126 --cpu-proof     also the CPU proof of exp and log over all
 #                                                     2^32 inputs (several more minutes)
-#   GPU=1 bash scripts/run_tests.sh cuda124           use GPU 1 instead of GPU 0
+#   GPU=1 bash scripts/run_tests.sh cuda126           use GPU 1 instead of GPU 0
 #
 # Each GPU test compares the kernels with an exact CPU implementation of the same definition,
 # bit for bit, across algorithms, split sizes and repeated runs. The exp/log test hashes the
 # outputs for all 2^32 float32 inputs; the hashes must equal the ones below on every GPU.
-# Output: results/<host>_<config>/tests/tests.log
+# Output: runs/<host>/<config>/<run-id>/tests/tests.log
 set -euo pipefail
 source "$(dirname "$0")/common.sh"
 load_config "${1:?usage: $0 cuda124|cuda126|cuda130 [--cpu-proof]}"
@@ -17,9 +18,10 @@ CPU_PROOF=0; [ "${2:-}" != "--cpu-proof" ] || CPU_PROOF=1
 GPU=${GPU:-0}
 export CUDA_VISIBLE_DEVICES=$GPU
 
-OUT="$REPO/results/${HOST}_${TAG}/tests"
-BIN="$REPRO_WORK/build/${TAG}_tests"
-mkdir -p "$OUT" "$BIN"
+OUT="$OUT/tests"
+mkdir -p "$(dirname "$OUT")" "$REPRO_WORK/build/$HOST/$TAG"
+mkdir "$OUT" || { echo "Test output already exists: $OUT"; exit 1; }
+BIN=$(mktemp -d "$REPRO_WORK/build/$HOST/$TAG/tests.XXXXXX")
 LOG="$OUT/tests.log"
 : > "$LOG"
 log() { echo "$@" | tee -a "$LOG"; }
